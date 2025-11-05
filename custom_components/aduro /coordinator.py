@@ -110,6 +110,10 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._previous_operation_mode: int | None = None
         self._previous_state: str | None = None
         
+        # Initialize timestamp attributes to prevent errors
+        self._last_network_update = datetime.now() - timedelta(minutes=10)
+        self._last_consumption_update = datetime.now() - timedelta(minutes=10)
+        
         super().__init__(
             hass,
             _LOGGER,
@@ -120,39 +124,48 @@ class AduroCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from the stove."""
         try:
+            _LOGGER.debug("Starting data update cycle")
+            
             # Discover stove IP if not known or too old
             if self.stove_ip is None or self._should_rediscover():
+                _LOGGER.debug("Attempting stove discovery")
                 await self._async_discover_stove()
             
             # Fetch all data
             data = {}
             
             # Get status data (most important)
+            _LOGGER.debug("Fetching status data")
             status_data = await self._async_get_status()
             if status_data:
                 data.update(status_data)
             
             # Get operating data
+            _LOGGER.debug("Fetching operating data")
             operating_data = await self._async_get_operating_data()
             if operating_data:
                 data.update(operating_data)
             
             # Get network data (less frequently)
             if self._should_update_network():
+                _LOGGER.debug("Fetching network data")
                 network_data = await self._async_get_network_data()
                 if network_data:
                     data.update(network_data)
             
             # Get consumption data (less frequently)
             if self._should_update_consumption():
+                _LOGGER.debug("Fetching consumption data")
                 consumption_data = await self._async_get_consumption_data()
                 if consumption_data:
                     data.update(consumption_data)
             
             # Process state changes and auto-actions
+            _LOGGER.debug("Processing state changes")
             await self._process_state_changes(data)
             
             # Check mode change progress
+            _LOGGER.debug("Checking mode change progress")
             await self._check_mode_change_progress(data)
             
             # Handle auto-resume after wood mode
@@ -161,24 +174,29 @@ class AduroCoordinator(DataUpdateCoordinator):
                 await self._async_resume_pellet_operation()
             
             # Update timers
+            _LOGGER.debug("Updating timers")
             self._update_timers(data)
             
             # Calculate pellet levels
+            _LOGGER.debug("Calculating pellet levels")
             self._calculate_pellet_levels(data)
             
             # Check for low pellet conditions
+            _LOGGER.debug("Checking pellet levels")
             await self._check_pellet_levels(data)
             
             # Add calculated/derived data
+            _LOGGER.debug("Adding calculated data")
             self._add_calculated_data(data)
             
             # Manage polling interval
             self._manage_polling_interval()
             
+            _LOGGER.debug("Data update cycle completed successfully")
             return data
             
         except Exception as err:
-            _LOGGER.error("Error fetching stove data: %s", err)
+            _LOGGER.error("Error fetching stove data: %s", err, exc_info=True)
             # Try to rediscover on next update
             self.stove_ip = None
             raise UpdateFailed(f"Error communicating with stove: {err}")
@@ -188,19 +206,30 @@ class AduroCoordinator(DataUpdateCoordinator):
         if self.last_discovery is None:
             return True
         # Rediscover every hour
-        return (datetime.now() - self.last_discovery) > timedelta(hours=1)
+        try:
+            return (datetime.now() - self.last_discovery) > timedelta(hours=1)
+        except TypeError:
+            # If last_discovery is somehow invalid, rediscover
+            _LOGGER.debug("Invalid last_discovery timestamp, forcing rediscovery")
+            return True
 
     def _should_update_network(self) -> bool:
         """Network data doesn't change often, update every 5 minutes."""
-        if not hasattr(self, '_last_network_update'):
+        try:
+            return (datetime.now() - self._last_network_update) > timedelta(minutes=5)
+        except (TypeError, AttributeError) as err:
+            _LOGGER.debug("Error checking network update time: %s, forcing update", err)
             self._last_network_update = datetime.now() - timedelta(minutes=10)
-        return (datetime.now() - self._last_network_update) > timedelta(minutes=5)
+            return True
 
     def _should_update_consumption(self) -> bool:
         """Consumption data changes daily, update every 5 minutes."""
-        if not hasattr(self, '_last_consumption_update'):
+        try:
+            return (datetime.now() - self._last_consumption_update) > timedelta(minutes=5)
+        except (TypeError, AttributeError) as err:
+            _LOGGER.debug("Error checking consumption update time: %s, forcing update", err)
             self._last_consumption_update = datetime.now() - timedelta(minutes=10)
-        return (datetime.now() - self._last_consumption_update) > timedelta(minutes=5)
+            return True
 
     def _manage_polling_interval(self) -> None:
         """Adjust polling interval based on whether we're expecting changes."""
@@ -363,7 +392,12 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Check for timeout
         if self._mode_change_started:
-            elapsed = (datetime.now() - self._mode_change_started).total_seconds()
+            try:
+                elapsed = (datetime.now() - self._mode_change_started).total_seconds()
+            except TypeError:
+                _LOGGER.warning("Invalid _mode_change_started timestamp, resetting")
+                self._mode_change_started = datetime.now()
+                elapsed = 0
             
             # Try resending after TIMEOUT_COMMAND_RESPONSE
             if elapsed > TIMEOUT_COMMAND_RESPONSE and self._resend_attempt < self._max_resend_attempts:
@@ -419,22 +453,32 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Timer 1
         if self._timer_startup_1_started:
-            elapsed = (datetime.now() - self._timer_startup_1_started).total_seconds()
-            remaining = max(0, TIMER_STARTUP_1 - int(elapsed))
-            timers["startup_1_remaining"] = remaining
-            
-            if remaining == 0:
+            try:
+                elapsed = (datetime.now() - self._timer_startup_1_started).total_seconds()
+                remaining = max(0, TIMER_STARTUP_1 - int(elapsed))
+                timers["startup_1_remaining"] = remaining
+                
+                if remaining == 0:
+                    self._timer_startup_1_started = None
+            except (TypeError, AttributeError) as err:
+                _LOGGER.debug("Error calculating timer 1: %s", err)
+                timers["startup_1_remaining"] = 0
                 self._timer_startup_1_started = None
         else:
             timers["startup_1_remaining"] = 0
         
         # Timer 2
         if self._timer_startup_2_started:
-            elapsed = (datetime.now() - self._timer_startup_2_started).total_seconds()
-            remaining = max(0, TIMER_STARTUP_2 - int(elapsed))
-            timers["startup_2_remaining"] = remaining
-            
-            if remaining == 0:
+            try:
+                elapsed = (datetime.now() - self._timer_startup_2_started).total_seconds()
+                remaining = max(0, TIMER_STARTUP_2 - int(elapsed))
+                timers["startup_2_remaining"] = remaining
+                
+                if remaining == 0:
+                    self._timer_startup_2_started = None
+            except (TypeError, AttributeError) as err:
+                _LOGGER.debug("Error calculating timer 2: %s", err)
+                timers["startup_2_remaining"] = 0
                 self._timer_startup_2_started = None
         else:
             timers["startup_2_remaining"] = 0
