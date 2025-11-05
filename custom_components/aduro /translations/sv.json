@@ -1,0 +1,302 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfigurera Aduro Hybridkamin",
+        "description": "Ställ in din Aduro kaminintegration",
+        "data": {
+          "stove_model": "Kaminmodell",
+          "stove_serial": "Kaminens Serienummer",
+          "stove_pin": "Kaminen PIN-kod",
+          "mqtt_host": "MQTT-server Värd",
+          "mqtt_port": "MQTT-server Port",
+          "mqtt_username": "MQTT Användarnamn (valfritt)",
+          "mqtt_password": "MQTT Lösenord (valfritt)"
+        },
+        "data_description": {
+          "stove_model": "Välj din Aduro kaminmodell (H1, H2, H3, H4, H5 eller H6)",
+          "stove_serial": "Serienumret som finns på din kamin",
+          "stove_pin": "PIN-koden för din kamin",
+          "mqtt_host": "IP-adressen eller värdnamnet för din MQTT-server",
+          "mqtt_port": "Porten för din MQTT-server (standard: 1883)",
+          "mqtt_username": "Valfritt: Användarnamn för MQTT-autentisering",
+          "mqtt_password": "Valfritt: Lösenord för MQTT-autentisering"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kunde inte ansluta till kaminen",
+      "invalid_auth": "Ogiltiga autentiseringsuppgifter",
+      "unknown": "Oväntat fel inträffade"
+    },
+    "abort": {
+      "already_configured": "Denna kamin är redan konfigurerad"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Konfigurera Aduro-alternativ",
+        "description": "Uppdatera dina Aduro kamininställningar",
+        "data": {
+          "stove_model": "Kaminmodell",
+          "mqtt_host": "MQTT-server Värd",
+          "mqtt_port": "MQTT-server Port",
+          "mqtt_username": "MQTT Användarnamn",
+          "mqtt_password": "MQTT Lösenord"
+        },
+        "data_description": {
+          "stove_model": "Ändra din kaminmodell vid behov",
+          "mqtt_host": "Uppdatera MQTT-serveradress",
+          "mqtt_port": "Uppdatera MQTT-serverport",
+          "mqtt_username": "Uppdatera MQTT användarnamn",
+          "mqtt_password": "Uppdatera MQTT lösenord"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "state": {
+        "name": "Tillstånd",
+        "state": {
+          "state_operating": "Drift {heatlevel}",
+          "state_stopped": "Stoppad",
+          "state_off": "Avstängd",
+          "state_operating_iii": "Drift III"
+        }
+      },
+      "substate": {
+        "name": "Undertillstånd",
+        "state": {
+          "substate_waiting": "Väntar",
+          "substate_ignition_1": "Upptändning 1",
+          "substate_ignition_2": "Upptändning 2",
+          "substate_normal": "Normal",
+          "substate_temp_reached": "Rumstemperatur nådd",
+          "substate_wood_burning": "Vedeldning",
+          "substate_failed_ignition": "Misslyckad tändning - Öppna luckan och kontrollera brännkoppen",
+          "substate_by_button": "På knapp",
+          "substate_wood_burning_question": "Vedeldning?",
+          "substate_no_fuel": "Inget bränsle",
+          "substate_unknown": "Okänd",
+          "substate_heating_up": "Värmer upp",
+          "substate_check_burn_cup": "Kontrollera brännkoppen"
+        }
+      },
+      "status_main": {
+        "name": "Status"
+      },
+      "status_sub": {
+        "name": "Statusdetalj"
+      },
+      "boiler_temp": {
+        "name": "Rumstemperatur"
+      },
+      "boiler_ref": {
+        "name": "Måltemperatur"
+      },
+      "smoke_temp": {
+        "name": "Röktemperatur"
+      },
+      "shaft_temp": {
+        "name": "Schakttemperatur"
+      },
+      "power_kw": {
+        "name": "Effektutgång"
+      },
+      "power_pct": {
+        "name": "Effektprocent"
+      },
+      "heatlevel": {
+        "name": "Värmenivå"
+      },
+      "heatlevel_display": {
+        "name": "Värmenivå Visning"
+      },
+      "operation_mode": {
+        "name": "Driftläge"
+      },
+      "pellet_amount": {
+        "name": "Pellets Kvar"
+      },
+      "pellet_percentage": {
+        "name": "Pelletsprocent"
+      },
+      "pellet_consumed": {
+        "name": "Pellets Förbrukade"
+      },
+      "consumption_total": {
+        "name": "Total Förbrukning"
+      },
+      "refill_counter": {
+        "name": "Påfyllningsräknare"
+      },
+      "consumption_day": {
+        "name": "Dagens Förbrukning"
+      },
+      "consumption_yesterday": {
+        "name": "Gårdagens Förbrukning"
+      },
+      "consumption_month": {
+        "name": "Denna Månads Förbrukning"
+      },
+      "consumption_year": {
+        "name": "Årets Förbrukning"
+      },
+      "stove_ip": {
+        "name": "Kaminen IP-adress"
+      },
+      "router_ssid": {
+        "name": "WiFi-nätverk"
+      },
+      "stove_rssi": {
+        "name": "WiFi-signalstyrka"
+      },
+      "stove_mac": {
+        "name": "MAC-adress"
+      },
+      "timer_startup_1": {
+        "name": "Tändningstimer 1"
+      },
+      "timer_startup_2": {
+        "name": "Tändningstimer 2"
+      },
+      "operating_time_stove": {
+        "name": "Total Drifttid"
+      },
+      "operating_time_auger": {
+        "name": "Skruv Drifttid"
+      },
+      "operating_time_ignition": {
+        "name": "Tändnings Drifttid"
+      },
+      "mode_transition": {
+        "name": "Lägesövergång"
+      },
+      "change_in_progress": {
+        "name": "Ändring Pågår"
+      },
+      "display_format": {
+        "name": "Visningsformat"
+      },
+      "display_target": {
+        "name": "Visningsmål"
+      },
+      "app_change_detected": {
+        "name": "Extern Ändring Upptäckt"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Ström"
+      },
+      "auto_shutdown": {
+        "name": "Automatisk Avstängning vid Låga Pellets"
+      },
+      "auto_resume_wood": {
+        "name": "Automatisk Återstart Efter Vedläge"
+      }
+    },
+    "number": {
+      "heatlevel": {
+        "name": "Värmenivå"
+      },
+      "temperature": {
+        "name": "Måltemperatur"
+      },
+      "pellet_capacity": {
+        "name": "Pelletskapacitet"
+      },
+      "notification_level": {
+        "name": "Låg Pellets Notifieringsnivå"
+      },
+      "shutdown_level": {
+        "name": "Automatisk Avstängnings Pelletsnivå"
+      }
+    },
+    "button": {
+      "refill_pellets": {
+        "name": "Fyll På Pellets"
+      },
+      "clean_stove": {
+        "name": "Rengör Kamin"
+      },
+      "toggle_mode": {
+        "name": "Växla Läge"
+      },
+      "resume_after_wood": {
+        "name": "Återuppta Efter Vedläge"
+      },
+      "force_auger": {
+        "name": "Tvinga Skruv"
+      }
+    }
+  },
+  "services": {
+    "start_stove": {
+      "name": "Starta Kamin",
+      "description": "Starta pelletskaminens drift."
+    },
+    "stop_stove": {
+      "name": "Stoppa Kamin",
+      "description": "Stoppa pelletskaminens drift."
+    },
+    "set_heatlevel": {
+      "name": "Ställ In Värmenivå",
+      "description": "Ställ in kaminens värmenivå (1-3). Byter även till värmenivådriftläge.",
+      "fields": {
+        "heatlevel": {
+          "name": "Värmenivå",
+          "description": "Värmenivå att ställa in (1=Låg, 2=Medel, 3=Hög)."
+        }
+      }
+    },
+    "set_temperature": {
+      "name": "Ställ In Temperatur",
+      "description": "Ställ in målrumstemperatur. Byter även till temperaturdriftläge.",
+      "fields": {
+        "temperature": {
+          "name": "Temperatur",
+          "description": "Måltemperatur i grader Celsius."
+        }
+      }
+    },
+    "set_operation_mode": {
+      "name": "Ställ In Driftläge",
+      "description": "Ställ in kaminens driftläge.",
+      "fields": {
+        "mode": {
+          "name": "Driftläge",
+          "description": "Driftläge: 0=Värmenivå, 1=Temperatur, 2=Ved"
+        }
+      }
+    },
+    "toggle_mode": {
+      "name": "Växla Läge",
+      "description": "Växla mellan värmenivå och temperaturdriftlägen."
+    },
+    "resume_after_wood_mode": {
+      "name": "Återuppta Efter Vedläge",
+      "description": "Återuppta pelletsdrift efter vedläge, återställ tidigare inställningar."
+    },
+    "force_auger": {
+      "name": "Tvinga Skruv",
+      "description": "Tvinga pelletsskruven att köra (för testning eller rensning)."
+    },
+    "set_custom": {
+      "name": "Ställ In Anpassad Parameter",
+      "description": "Ställ in en anpassad kaminparameter efter sökväg och värde (avancerat).",
+      "fields": {
+        "path": {
+          "name": "Parametersökväg",
+          "description": "Parametersökvägen (t.ex. 'auger.forced_run')."
+        },
+        "value": {
+          "name": "Värde",
+          "description": "Värdet att ställa in (kan vara sträng, nummer eller boolean)."
+        }
+      }
+    }
+  }
+}
