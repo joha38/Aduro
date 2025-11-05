@@ -1,8 +1,0 @@
-# add following lines to your configuration.yaml to enable provided config files
-homeassistant:
-  packages:
-    aduro: !include custom_components/aduro/aduro.yaml
-
-script aduro: !include custom_components/aduro/pyduro_scripts.yaml
-python_script: !include python_script.yaml
-mqtt: !include custom_components/aduro/mqtt_devices.yaml
