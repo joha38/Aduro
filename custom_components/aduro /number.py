@@ -97,6 +97,11 @@ class AduroHeatlevelNumber(AduroNumberBase):
     @property
     def native_value(self) -> float | None:
         """Return the current heat level."""
+        # Show target while changing
+        if self.coordinator._change_in_progress and self.coordinator._target_heatlevel is not None:
+            return self.coordinator._target_heatlevel
+        
+        # Show actual value from stove
         if self.coordinator.data and "operating" in self.coordinator.data:
             return self.coordinator.data["operating"].get("heatlevel")
         return None
