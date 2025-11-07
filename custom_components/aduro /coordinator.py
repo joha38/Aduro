@@ -267,6 +267,15 @@ class AduroCoordinator(DataUpdateCoordinator):
         current_operation_mode = data["status"].get("operation_mode")
         current_temperature_ref = data["operating"].get("boiler_ref")
         
+        _LOGGER.debug(
+            "State change check - Previous HL: %s, Current HL: %s, Previous Mode: %s, Current Mode: %s, Change in progress: %s",
+            self._previous_heatlevel,
+            current_heatlevel,
+            self._previous_operation_mode,
+            current_operation_mode,
+            self._change_in_progress
+        )
+
         # Track wood mode transitions
         is_in_wood_mode = current_state in ["9", "14"]
         
@@ -287,19 +296,42 @@ class AduroCoordinator(DataUpdateCoordinator):
                 _LOGGER.info("Auto-resume enabled, will attempt to restore pellet operation")
                 # Trigger resume on next update cycle
                 data["auto_resume_wood_mode"] = True
-        
+
+        # Initialize previous values on first run
+        if self._previous_heatlevel is None:
+            self._previous_heatlevel = current_heatlevel
+            self._previous_temperature = current_temperature_ref
+            self._previous_operation_mode = current_operation_mode
+            _LOGGER.debug("Initialized previous values on first run")
+            # Don't detect changes on first run
+            self._previous_state = current_state
+            data["app_change_detected"] = False
+            return
+
         # Detect external changes (from app)
         app_change_detected = False
         
         if current_operation_mode == 0:  # Heatlevel mode
             if (self._previous_heatlevel is not None and 
                 current_heatlevel != self._previous_heatlevel and
-                not self._toggle_heat_target):
+                not self._change_in_progress):
                 app_change_detected = True
-                _LOGGER.info("External heatlevel change detected: %s -> %s", 
-                           self._previous_heatlevel, current_heatlevel)
+                _LOGGER.info(
+                    "External heatlevel change detected: %s -> %s (power_pct: %d%%), change_in_progress: %s",
+                    self._previous_heatlevel,
+                    current_heatlevel,
+                    data["operating"].get("power_pct", 0),
+                    self._change_in_progress
+                )
                 # Update our target to match
                 self._target_heatlevel = current_heatlevel
+                
+                # ALSO clear any stale change_in_progress flag
+                if self._change_in_progress:
+                    _LOGGER.warning("Change was in progress during external change - clearing flags")
+                    self._change_in_progress = False
+                    self._mode_change_started = None
+                    self._resend_attempt = 0
                 
         elif current_operation_mode == 1:  # Temperature mode
             if (self._previous_temperature is not None and 
@@ -343,6 +375,27 @@ class AduroCoordinator(DataUpdateCoordinator):
             self._timer_startup_2_started = datetime.now()
             _LOGGER.debug("Started startup timer 2")
         
+        # Clear change state if external change detected while we're changing
+        if app_change_detected and self._change_in_progress:
+            _LOGGER.info("External change detected - clearing our change state")
+            self._change_in_progress = False
+            self._toggle_heat_target = False
+            self._mode_change_started = None
+            self._resend_attempt = 0
+
+        # Update targets to match current values when external change detected
+        if app_change_detected:
+            if current_operation_mode == 0:
+                self._target_heatlevel = current_heatlevel
+                self._target_operation_mode = 0
+            elif current_operation_mode == 1:
+                self._target_temperature = current_temperature_ref
+                self._target_operation_mode = 1
+            
+            # IMPORTANT: Clear change_in_progress to ensure targets are used
+            self._change_in_progress = False
+            self._mode_change_started = None
+
         # Update previous values
         self._previous_state = current_state
         self._previous_heatlevel = current_heatlevel
@@ -380,11 +433,18 @@ class AduroCoordinator(DataUpdateCoordinator):
                 change_complete = False
         
         if change_complete:
-            _LOGGER.info("Mode change completed successfully")
+            _LOGGER.info(
+                "Mode change completed - HL: %s, Temp: %s, Mode: %s",
+                current_heatlevel,
+                current_temperature_ref,
+                current_operation_mode
+            )
+            # Clear ALL flags
             self._change_in_progress = False
             self._toggle_heat_target = False
             self._mode_change_started = None
             self._resend_attempt = 0
+            # Clear targets
             self._target_heatlevel = None
             self._target_temperature = None
             self._target_operation_mode = None
@@ -686,7 +746,11 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "001*"  # payload
             )
             
-            data = response.parse_payload().split(',')
+            #data = response.parse_payload().split(',')
+            payload = response.parse_payload() #
+            _LOGGER.debug("Full payload received from stove: %s", payload) #
+
+            data = payload.split(',') #
             
             operating_data = {
                 "boiler_temp": float(data[0]) if data[0] else 0,
@@ -695,7 +759,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "state": data[6],
                 "substate": data[5],
                 "power_kw": float(data[31]) if data[31] else 0,
-                "power_pct": float(data[36]) if data[36] else 0,
+                "power_pct": float(data[99]) if data[104] else 0,  # CHANGED from data[36]
                 "shaft_temp": float(data[35]) if data[35] else 0,
                 "smoke_temp": float(data[37]) if data[37] else 0,
                 "internet_uptime": data[38],
@@ -706,9 +770,25 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "operating_time_stove": int(data[121]) if data[121] else 0,
             }
             
-            # Extract heatlevel from power_pct
-            power_pct = int(float(data[36])) if data[36] else 0
-            operating_data["heatlevel"] = HEAT_LEVEL_POWER_MAP.get(power_pct, 1)
+            # Extract heatlevel from power_pct with tolerance for inexact values
+            power_pct = int(float(data[99])) if data[104] else 0
+
+            # Map power percentage to heatlevel with tolerance
+            # The stove returns approximate values, not exactly 10, 50, or 100
+            if power_pct <= 30:  # Level 1: around 10% ± 20
+                heatlevel = 1
+            elif power_pct <= 75:  # Level 2: around 50% ± 25
+                heatlevel = 2
+            else:  # Level 3: around 100%
+                heatlevel = 3
+
+            operating_data["heatlevel"] = heatlevel
+
+            _LOGGER.debug(
+                "Extracted heatlevel: %d from power_pct: %d%% (tolerance-based)",
+                heatlevel,
+                power_pct
+            )
             
             # Get operation mode from status if available
             if self.data and "status" in self.data:
@@ -947,27 +1027,40 @@ class AduroCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Invalid heatlevel: %s (must be 1, 2, or 3)", heatlevel)
             return False
         
-        _LOGGER.info("Setting heatlevel to: %s", heatlevel)
+        _LOGGER.info("Setting heatlevel to: %s (power: %s%%)", heatlevel, POWER_HEAT_LEVEL_MAP[heatlevel])
         
+        # Set targets
         self._target_heatlevel = heatlevel
+        self._target_operation_mode = 0
         self._change_in_progress = True
         self._mode_change_started = datetime.now()
         self._resend_attempt = 0
         
+        # STEP 1: Set mode FIRST
+        _LOGGER.debug("Step 1: Setting operation mode to heatlevel (0)")
+        mode_result = await self._async_send_command("regulation.operation_mode", 0)
+        if not mode_result:
+            _LOGGER.error("Failed to set operation mode")
+            self._change_in_progress = False
+            self._target_heatlevel = None
+            self._target_operation_mode = None
+            return False
+        
+        # Wait for mode change
+        await asyncio.sleep(3)
+        
+        # STEP 2: Set heatlevel value
+        _LOGGER.debug("Step 2: Setting heatlevel power to: %s%%", POWER_HEAT_LEVEL_MAP[heatlevel])
         fixed_power = POWER_HEAT_LEVEL_MAP[heatlevel]
         result = await self._async_send_command("regulation.fixed_power", fixed_power)
         
         if result:
-            # Also set operation mode to heatlevel mode
-            await asyncio.sleep(3)
-            self._target_operation_mode = 0
-            mode_result = await self._async_send_command("regulation.operation_mode", 0)
-            if not mode_result:
-                _LOGGER.error("Failed to set operation mode to heatlevel mode")
-                return False
-            _LOGGER.info("Heatlevel set successfully")
+            _LOGGER.info("Heatlevel commands sent, waiting for stove confirmation")
         else:
-            _LOGGER.error("Failed to set heatlevel to %s", heatlevel)
+            _LOGGER.error("Failed to set heatlevel")
+            self._change_in_progress = False
+            self._target_heatlevel = None
+            self._target_operation_mode = None
         
         return result
 
@@ -975,24 +1068,37 @@ class AduroCoordinator(DataUpdateCoordinator):
         """Set the target temperature."""
         _LOGGER.info("Setting temperature to: %s°C", temperature)
         
+        # Set targets
         self._target_temperature = temperature
+        self._target_operation_mode = 1
         self._change_in_progress = True
         self._mode_change_started = datetime.now()
         self._resend_attempt = 0
         
+        # STEP 1: Set mode FIRST
+        _LOGGER.debug("Step 1: Setting operation mode to temperature (1)")
+        mode_result = await self._async_send_command("regulation.operation_mode", 1)
+        if not mode_result:
+            _LOGGER.error("Failed to set operation mode")
+            self._change_in_progress = False
+            self._target_temperature = None
+            self._target_operation_mode = None
+            return False
+        
+        # Wait for mode change
+        await asyncio.sleep(3)
+        
+        # STEP 2: Set temperature value
+        _LOGGER.debug("Step 2: Setting temperature to: %s°C", temperature)
         result = await self._async_send_command("boiler.temp", temperature)
         
         if result:
-            # Also set operation mode to temperature mode
-            await asyncio.sleep(3)
-            self._target_operation_mode = 1
-            mode_result = await self._async_send_command("regulation.operation_mode", 1)
-            if not mode_result:
-                _LOGGER.error("Failed to set operation mode to temperature mode")
-                return False
-            _LOGGER.info("Temperature set successfully")
+            _LOGGER.info("Temperature commands sent, waiting for stove confirmation")
         else:
-            _LOGGER.error("Failed to set temperature to %s°C", temperature)
+            _LOGGER.error("Failed to set temperature")
+            self._change_in_progress = False
+            self._target_temperature = None
+            self._target_operation_mode = None
         
         return result
 
