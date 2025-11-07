@@ -21,11 +21,6 @@ from .const import (
     CONF_STOVE_SERIAL,
     CONF_STOVE_PIN,
     CONF_STOVE_MODEL,
-    CONF_MQTT_HOST,
-    CONF_MQTT_PORT,
-    CONF_MQTT_USERNAME,
-    CONF_MQTT_PASSWORD,
-    CONF_MQTT_BASE_PATH,
     DEFAULT_SCAN_INTERVAL,
     UPDATE_INTERVAL_FAST,
     UPDATE_INTERVAL_NORMAL,
@@ -58,11 +53,6 @@ class AduroCoordinator(DataUpdateCoordinator):
         self.serial = entry.data[CONF_STOVE_SERIAL]
         self.pin = entry.data[CONF_STOVE_PIN]
         self.stove_model = entry.data.get(CONF_STOVE_MODEL, "H2")
-        self.mqtt_host = entry.data.get(CONF_MQTT_HOST)
-        self.mqtt_port = entry.data.get(CONF_MQTT_PORT)
-        self.mqtt_username = entry.data.get(CONF_MQTT_USERNAME)
-        self.mqtt_password = entry.data.get(CONF_MQTT_PASSWORD)
-        self.mqtt_base_path = entry.data.get(CONF_MQTT_BASE_PATH)
         
         # Stove connection details
         self.stove_ip: str | None = None
