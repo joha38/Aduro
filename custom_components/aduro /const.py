@@ -9,11 +9,6 @@ PLATFORMS: Final = ["sensor", "switch", "number", "button"]
 CONF_STOVE_SERIAL: Final = "stove_serial"
 CONF_STOVE_PIN: Final = "stove_pin"
 CONF_STOVE_MODEL: Final = "stove_model"
-CONF_MQTT_HOST: Final = "mqtt_host"
-CONF_MQTT_PORT: Final = "mqtt_port"
-CONF_MQTT_USERNAME: Final = "mqtt_username"
-CONF_MQTT_PASSWORD: Final = "mqtt_password"
-CONF_MQTT_BASE_PATH: Final = "mqtt_base_path"
 
 # Stove models
 STOVE_MODEL_H1: Final = "H1"
@@ -32,19 +27,8 @@ STOVE_MODELS: Final = [
     STOVE_MODEL_H6,
 ]
 
-STOVE_MODEL_BASE_PATHS: Final = {
-    STOVE_MODEL_H1: "aduro_h1/",
-    STOVE_MODEL_H2: "aduro_h2/",
-    STOVE_MODEL_H3: "aduro_h3/",
-    STOVE_MODEL_H4: "aduro_h4/",
-    STOVE_MODEL_H5: "aduro_h5/",
-    STOVE_MODEL_H6: "aduro_h6/",
-}
-
 # Defaults
 DEFAULT_STOVE_MODEL: Final = STOVE_MODEL_H2
-DEFAULT_MQTT_PORT: Final = 1883
-DEFAULT_MQTT_BASE_PATH: Final = STOVE_MODEL_BASE_PATHS[STOVE_MODEL_H2]
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=20)
 DEFAULT_CAPACITY_PELLETS: Final = 9.5
 DEFAULT_NOTIFICATION_LEVEL: Final = 10
