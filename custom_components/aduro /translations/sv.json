@@ -7,20 +7,12 @@
         "data": {
           "stove_model": "Kaminmodell",
           "stove_serial": "Kaminens Serienummer",
-          "stove_pin": "Kaminen PIN-kod",
-          "mqtt_host": "MQTT-server Värd",
-          "mqtt_port": "MQTT-server Port",
-          "mqtt_username": "MQTT Användarnamn (valfritt)",
-          "mqtt_password": "MQTT Lösenord (valfritt)"
+          "stove_pin": "Kaminen PIN-kod"
         },
         "data_description": {
           "stove_model": "Välj din Aduro kaminmodell (H1, H2, H3, H4, H5 eller H6)",
           "stove_serial": "Serienumret som finns på din kamin",
-          "stove_pin": "PIN-koden för din kamin",
-          "mqtt_host": "IP-adressen eller värdnamnet för din MQTT-server",
-          "mqtt_port": "Porten för din MQTT-server (standard: 1883)",
-          "mqtt_username": "Valfritt: Användarnamn för MQTT-autentisering",
-          "mqtt_password": "Valfritt: Lösenord för MQTT-autentisering"
+          "stove_pin": "PIN-koden för din kamin"
         }
       }
     },
@@ -39,18 +31,10 @@
         "title": "Konfigurera Aduro-alternativ",
         "description": "Uppdatera dina Aduro kamininställningar",
         "data": {
-          "stove_model": "Kaminmodell",
-          "mqtt_host": "MQTT-server Värd",
-          "mqtt_port": "MQTT-server Port",
-          "mqtt_username": "MQTT Användarnamn",
-          "mqtt_password": "MQTT Lösenord"
+          "stove_model": "Kaminmodell"
         },
         "data_description": {
-          "stove_model": "Ändra din kaminmodell vid behov",
-          "mqtt_host": "Uppdatera MQTT-serveradress",
-          "mqtt_port": "Uppdatera MQTT-serverport",
-          "mqtt_username": "Uppdatera MQTT användarnamn",
-          "mqtt_password": "Uppdatera MQTT lösenord"
+          "stove_model": "Ändra din kaminmodell vid behov"
         }
       }
     }
