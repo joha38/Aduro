@@ -59,8 +59,6 @@ async def async_setup_entry(
         AduroPowerPctSensor(coordinator, entry),
         
         # Operation sensors
-        AduroHeatlevelSensor(coordinator, entry),
-        AduroHeatlevelDisplaySensor(coordinator, entry),
         AduroOperationModeSensor(coordinator, entry),
         
         # Pellet sensors
@@ -397,39 +395,6 @@ class AduroPowerPctSensor(AduroSensorBase):
 # =============================================================================
 # Operation Sensors
 # =============================================================================
-
-class AduroHeatlevelSensor(AduroSensorBase):
-    """Sensor for heat level (1-3)."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "heatlevel", "Heat Level")
-        self._attr_icon = "mdi:fire"
-
-    @property
-    def native_value(self) -> int | None:
-        """Return the heat level."""
-        if self.coordinator.data and "operating" in self.coordinator.data:
-            return self.coordinator.data["operating"].get("heatlevel")
-        return None
-
-
-class AduroHeatlevelDisplaySensor(AduroSensorBase):
-    """Sensor for heat level display (I, II, III)."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "heatlevel_display", "Heat Level Display")
-        self._attr_icon = "mdi:fire"
-
-    @property
-    def native_value(self) -> str | None:
-        """Return the heat level display."""
-        if self.coordinator.data and "operating" in self.coordinator.data:
-            heatlevel = self.coordinator.data["operating"].get("heatlevel", 1)
-            return HEAT_LEVEL_DISPLAY.get(heatlevel, str(heatlevel))
-        return None
-
 
 class AduroOperationModeSensor(AduroSensorBase):
     """Sensor for operation mode."""
