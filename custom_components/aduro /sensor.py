@@ -21,6 +21,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity import EntityCategory
 
 from .const import (
     DOMAIN,
@@ -79,6 +80,7 @@ async def async_setup_entry(
         AduroRouterSSIDSensor(coordinator, entry),
         AduroStoveRSSISensor(coordinator, entry),
         AduroStoveMacSensor(coordinator, entry),
+        AduroFirmwareVersionSensor(coordinator, entry),
         
         # Timer sensors
         AduroTimerStartup1Sensor(coordinator, entry),
@@ -112,23 +114,51 @@ class AduroSensorBase(CoordinatorEntity, SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
+        self.entry = entry
         self._attr_has_entity_name = True
         self._attr_unique_id = f"{entry.entry_id}_{sensor_type}"
         self._attr_name = name
         self._sensor_type = sensor_type
-        self._last_valid_value = None  # Store last valid value
+        self._last_valid_value = None
+
+    def combined_firmware_version(self) -> str | None:
+        """Return combined firmware version string."""
+        version = self.coordinator.firmware_version
+        build = self.coordinator.firmware_build
+
+        _LOGGER.debug(
+            "Getting firmware version - version: %s, build: %s",
+            version,
+            build
+        )
+
+        if version and build:
+            return f"{version}.{build}"
+        elif version:
+            return version
+        return None
+
 
     @property
     def device_info(self):
         """Return device information."""
-        return {
-            "identifiers": {(DOMAIN, self.coordinator.entry.entry_id)},
+        # Always get the latest firmware version from coordinator
+        sw_version = self.combined_firmware_version()
+        
+        # Base device data - always include these
+        device_data = {
+            "identifiers": {(DOMAIN, f"aduro_{self.coordinator.entry.entry_id}")},
             "name": f"Aduro {self.coordinator.stove_model}",
             "manufacturer": "Aduro",
             "model": f"Hybrid {self.coordinator.stove_model}",
-            "sw_version": self.coordinator.entry.data.get("version", "Unknown"),
         }
-    
+        
+        # ALWAYS include sw_version, even if None initially
+        # This ensures the device registry entry has the field
+        device_data["sw_version"] = sw_version
+        
+        return device_data
+        
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
@@ -141,7 +171,7 @@ class AduroSensorBase(CoordinatorEntity, SensorEntity):
             return False
         
         return True
-    
+
     def _get_cached_value(self, current_value, default=None):
         """Return current value or last cached value if current is None."""
         if current_value is not None:
@@ -646,12 +676,14 @@ class AduroStoveIPSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "stove_ip", "Stove IP")
         self._attr_icon = "mdi:ip-network"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def native_value(self) -> str | None:
         """Return the stove IP."""
         return self.coordinator.stove_ip
         
+
 class AduroRouterSSIDSensor(AduroSensorBase):
     """Sensor for router SSID."""
 
@@ -659,6 +691,7 @@ class AduroRouterSSIDSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "router_ssid", "Router SSID")
         self._attr_icon = "mdi:wifi"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def native_value(self) -> str | None:
@@ -678,6 +711,7 @@ class AduroStoveRSSISensor(AduroSensorBase):
         self._attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
         self._attr_native_unit_of_measurement = "dBm"
         self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC 
 
     @property
     def native_value(self) -> int | None:
@@ -700,6 +734,7 @@ class AduroStoveMacSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "stove_mac", "Stove MAC")
         self._attr_icon = "mdi:network"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def native_value(self) -> str | None:
@@ -708,6 +743,34 @@ class AduroStoveMacSensor(AduroSensorBase):
         if self.coordinator.data and "network" in self.coordinator.data:
             current_value = self.coordinator.data["network"].get("stove_mac")
         return self._get_cached_value(current_value)
+
+class AduroFirmwareVersionSensor(AduroSensorBase):
+    """Sensor for stove firmware version."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "firmware_version", "Firmware Version")
+        self._attr_icon = "mdi:chip"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the combined firmware version string."""
+        if self.coordinator.firmware_version and self.coordinator.firmware_build:
+            return f"{self.coordinator.firmware_version}.{self.coordinator.firmware_build}"
+        elif self.coordinator.firmware_version:
+            return self.coordinator.firmware_version
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        attrs: dict[str, Any] = {}
+        if self.coordinator.firmware_version:
+            attrs["firmware_version"] = self.coordinator.firmware_version
+        if self.coordinator.firmware_build:
+            attrs["firmware_build"] = self.coordinator.firmware_build
+        return attrs
 
 # =============================================================================
 # Timer Sensors
