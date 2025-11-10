@@ -10,11 +10,14 @@ from pyduro.actions import discover, get, set, raw, STATUS_PARAMS
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed
+
 
 from .const import (
     DOMAIN,
@@ -57,6 +60,11 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Stove connection details
         self.stove_ip: str | None = None
         self.last_discovery: datetime | None = None
+
+        #Stove software details
+        self.firmware_version: str | None = None
+        self.firmware_build: str | None = None
+        self.device_id = f"aduro_{entry.entry_id}"
         
         # Fast polling management
         self._fast_poll_count = 0
@@ -648,24 +656,57 @@ class AduroCoordinator(DataUpdateCoordinator):
     async def _async_discover_stove(self) -> None:
         """Discover the stove on the network."""
         try:
-            response = await self.hass.async_add_executor_job(
-                discover.run
-            )
+            response = await self.hass.async_add_executor_job(discover.run)
             data = response.parse_payload()
+
+            self.stove_ip = data.get("IP", CLOUD_BACKUP_ADDRESS)
             
-            self.stove_ip = data.get('IP', CLOUD_BACKUP_ADDRESS)
+            # Store previous versions to detect changes
+            old_version = self.firmware_version
+            old_build = self.firmware_build
             
-            # Fallback to cloud if IP is invalid
+            self.firmware_version = data.get("Ver")
+            self.firmware_build = data.get("Build")
+
+            _LOGGER.debug(
+                "Discovery complete - IP: %s, Version: %s, Build: %s",
+                self.stove_ip,
+                self.firmware_version,
+                self.firmware_build,
+            )
+
             if not self.stove_ip or "0.0.0.0" in self.stove_ip:
                 self.stove_ip = CLOUD_BACKUP_ADDRESS
                 _LOGGER.warning(
-                    "Invalid stove IP, using cloud backup: %s",
-                    CLOUD_BACKUP_ADDRESS
+                    "Invalid stove IP, using cloud backup: %s", CLOUD_BACKUP_ADDRESS
                 )
-            
+
             self.last_discovery = datetime.now()
-            _LOGGER.info("Discovered stove at: %s", self.stove_ip)
+            _LOGGER.info(
+                "Discovered stove at: %s (Firmware: %s Build: %s)",
+                self.stove_ip,
+                self.firmware_version,
+                self.firmware_build,
+            )
+
+            # Check if firmware changed
+            version_changed = (old_version != self.firmware_version or 
+                            old_build != self.firmware_build)
             
+
+            # Update device registry (but only after initial setup is complete)
+            if self.firmware_version or self.firmware_build:
+                if version_changed and old_version is not None:
+                    _LOGGER.info(
+                        "Firmware version changed from %s.%s to %s.%s",
+                        old_version or "?",
+                        old_build or "?",
+                        self.firmware_version or "?",
+                        self.firmware_build or "?"
+                    )
+                    # Only call update if not first discovery (device exists)
+                    await self._update_device_registry()
+
         except Exception as err:
             _LOGGER.warning("Discovery failed, using cloud backup: %s", err)
             self.stove_ip = CLOUD_BACKUP_ADDRESS
@@ -867,6 +908,48 @@ class AduroCoordinator(DataUpdateCoordinator):
         except Exception as err:
             _LOGGER.error("Error getting consumption data: %s", err)
             return None
+
+    async def _update_device_registry(self):
+        """Update the device info in Home Assistant registry."""
+        if not (self.firmware_version or self.firmware_build):
+            _LOGGER.debug("Firmware info not available yet, skipping device update.")
+            return
+
+        # Build firmware version string
+        if self.firmware_version and self.firmware_build:
+            new_version = f"{self.firmware_version}.{self.firmware_build}"
+        elif self.firmware_version:
+            new_version = self.firmware_version
+        else:
+            return
+
+        # Get device registry
+        device_registry = dr.async_get(self.hass)
+
+        # Find the device using the SAME identifiers as in device_info
+        device_entry = device_registry.async_get_device(
+            identifiers={(DOMAIN, f"aduro_{self.coordinator.entry.entry_id}")}
+        )
+
+        if device_entry:
+            # Only update if version has changed or is not set
+            if device_entry.sw_version != new_version:
+                _LOGGER.info(
+                    "Updating device firmware: %s -> %s",
+                    device_entry.sw_version or "Unknown",
+                    new_version
+                )
+                device_registry.async_update_device(
+                    device_entry.id,
+                    sw_version=new_version
+                )
+            else:
+                _LOGGER.debug("Firmware version unchanged: %s", new_version)
+        else:
+            _LOGGER.warning(
+                "Could not find device with identifiers: %s",
+                (DOMAIN, self.entry.entry_id)
+            )
 
     # -------------------------------------------------------------------------
     # Pellet management methods
