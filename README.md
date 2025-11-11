@@ -147,9 +147,9 @@ To change settings later:
 - **WiFi Signal Strength** - RSSI in dBm
 - **MAC Address** - Network MAC
 
-#### Firmware
+#### Software
 - **Firmware** - Version and build
-- 
+
 #### Runtime
 - **Total Operating Time** - Lifetime runtime
 - **Auger Operating Time** - Auger runtime
