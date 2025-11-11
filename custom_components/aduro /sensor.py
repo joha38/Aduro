@@ -57,7 +57,6 @@ async def async_setup_entry(
         
         # Power sensors
         AduroPowerKwSensor(coordinator, entry),
-        AduroPowerPctSensor(coordinator, entry),
         
         # Operation sensors
         AduroOperationModeSensor(coordinator, entry),
@@ -81,10 +80,6 @@ async def async_setup_entry(
         AduroStoveRSSISensor(coordinator, entry),
         AduroStoveMacSensor(coordinator, entry),
         AduroFirmwareVersionSensor(coordinator, entry),
-        
-        # Timer sensors
-        AduroTimerStartup1Sensor(coordinator, entry),
-        AduroTimerStartup2Sensor(coordinator, entry),
         
         # Runtime sensors
         AduroOperatingTimeStoveSensor(coordinator, entry),
@@ -427,24 +422,6 @@ class AduroPowerKwSensor(AduroSensorBase):
         return None
 
 
-class AduroPowerPctSensor(AduroSensorBase):
-    """Sensor for power percentage."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "power_pct", "Power Percentage")
-        self._attr_native_unit_of_measurement = PERCENTAGE
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_icon = "mdi:percent"
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the power percentage."""
-        if self.coordinator.data and "operating" in self.coordinator.data:
-            return self.coordinator.data["operating"].get("power_pct")
-        return None
-
-
 # =============================================================================
 # Operation Sensors
 # =============================================================================
@@ -771,65 +748,6 @@ class AduroFirmwareVersionSensor(AduroSensorBase):
         if self.coordinator.firmware_build:
             attrs["firmware_build"] = self.coordinator.firmware_build
         return attrs
-
-# =============================================================================
-# Timer Sensors
-# =============================================================================
-
-class AduroTimerStartup1Sensor(AduroSensorBase):
-    """Sensor for startup timer 1 remaining time."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "timer_startup_1", "Startup Timer 1")
-        self._attr_device_class = SensorDeviceClass.DURATION
-        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
-        self._attr_icon = "mdi:timer"
-
-    @property
-    def native_value(self) -> int | None:
-        """Return the remaining time."""
-        if self.coordinator.data and "timers" in self.coordinator.data:
-            return self.coordinator.data["timers"].get("startup_1_remaining", 0)
-        return 0
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return formatted time."""
-        seconds = self.native_value or 0
-        minutes = seconds // 60
-        secs = seconds % 60
-        return {
-            "formatted": f"{minutes:02d}:{secs:02d}",
-        }
-
-
-class AduroTimerStartup2Sensor(AduroSensorBase):
-    """Sensor for startup timer 2 remaining time."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "timer_startup_2", "Startup Timer 2")
-        self._attr_device_class = SensorDeviceClass.DURATION
-        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
-        self._attr_icon = "mdi:timer"
-
-    @property
-    def native_value(self) -> int | None:
-        """Return the remaining time."""
-        if self.coordinator.data and "timers" in self.coordinator.data:
-            return self.coordinator.data["timers"].get("startup_2_remaining", 0)
-        return 0
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return formatted time."""
-        seconds = self.native_value or 0
-        minutes = seconds // 60
-        secs = seconds % 60
-        return {
-            "formatted": f"{minutes:02d}:{secs:02d}",
-        }
 
 
 # =============================================================================
