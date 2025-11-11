@@ -76,7 +76,7 @@ TEMP_STEP: Final = 1
 
 # Pellet capacity settings
 PELLET_CAPACITY_MIN: Final = 8.0
-PELLET_CAPACITY_MAX: Final = 10.0
+PELLET_CAPACITY_MAX: Final = 25.0
 PELLET_CAPACITY_STEP: Final = 0.1
 
 # Notification settings
