@@ -638,7 +638,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Format display
         if display_target_type == "heatlevel":
             from .const import HEAT_LEVEL_DISPLAY
-            display_format = f"Heat Level (room temp.): {HEAT_LEVEL_DISPLAY.get(display_target, display_target)} ({current_temperature})°C"
+            display_format = f"Heat Level (room temp.): {display_target} ({current_temperature})°C"
         elif display_target_type == "temperature":
             display_format = f"Target temp. (room temp.): {display_target} ({current_temperature})°C"
         else:
