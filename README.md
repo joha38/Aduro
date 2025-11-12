@@ -135,7 +135,6 @@ To change settings later:
 - **Pellets Remaining** - Remaining pellets (kg)
 - **Pellets Percentage** - Remaining pellets (%)
 - **Pellets Consumed** - Consumed since last refill (kg)
-- **Total Consumption** - Lifetime consumption (kg)
 - **Refill Counter** - Refills since cleaning
 
 #### Consumption
@@ -143,6 +142,7 @@ To change settings later:
 - **Yesterday's Consumption** - Previous day (kg)
 - **This Month's Consumption** - Current month (kg)
 - **This Year's Consumption** - Current year (kg)
+- **Total Consumption** - Lifetime consumption (kg)
 
 #### Network
 - **Stove IP Address** - Current IP
@@ -159,7 +159,6 @@ To change settings later:
 - **Ignition Operating Time** - Ignition runtime
 
 #### Calculated
-- **Mode Transition** - Transition state
 - **Change In Progress** - Boolean
 - **Display Format** - Formatted display text
 - **Display Target** - Current target value
