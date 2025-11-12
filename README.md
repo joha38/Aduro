@@ -1,4 +1,6 @@
 # ALPHA-RELEASE UNDER CONSTRUCTION!!!
+All functions are not yet tested.
+
 # Aduro Hybrid Stove Integration for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
