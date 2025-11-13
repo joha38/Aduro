@@ -187,6 +187,7 @@ class AduroStateSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "state", "State")
         self._attr_icon = "mdi:state-machine"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
     def native_value(self) -> str | None:
@@ -203,6 +204,7 @@ class AduroSubstateSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "substate", "Substate")
         self._attr_icon = "mdi:state-machine"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
     def native_value(self) -> str | None:
@@ -431,6 +433,7 @@ class AduroOperationModeSensor(AduroSensorBase):
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "operation_mode", "Operation Mode")
+        self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
     def native_value(self) -> int | None:
