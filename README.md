@@ -408,6 +408,17 @@ If your stove reports states not in the integration:
 
 See [ADDING_STATES.md](ADDING_STATES.md) for details.
 
+
+## Development plans/wish list
+
+- For Alpha-releases: test that all functions are working as intended.
+- Update integration with all relevant translations between state/substates-numbers and their related name.
+- Get confirmation/information about the remaining Aduro hybrid stoves.
+- Estimation of pellets consumption over time, depending on temperature settings, heat level settings, outside temperature and other relevant factors to estimate a time for when the stove have consumed all pellets.
+- A similar function of Aduro Smart Response, that can give pointers when using firewood.
+- External and wireless temperature sensor is available as an accessory. Could it be possible to use other temperature sensors and send the information to the stove via Home Assistant?
+
+
 ## Credits
 
 This integration is built upon the excellent work of:
