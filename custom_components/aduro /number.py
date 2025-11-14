@@ -35,7 +35,7 @@ from .coordinator import AduroCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 # Debounce delay in seconds - wait this long after last change before sending
-DEBOUNCE_DELAY = 1.0
+DEBOUNCE_DELAY = 0.7
 
 
 async def async_setup_entry(
