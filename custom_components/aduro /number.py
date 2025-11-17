@@ -7,7 +7,7 @@ from typing import Any
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfMass, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, UnitOfMass, UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -52,6 +52,10 @@ async def async_setup_entry(
         AduroPelletCapacityNumber(coordinator, entry),
         AduroNotificationLevelNumber(coordinator, entry),
         AduroShutdownLevelNumber(coordinator, entry),
+        AduroHighSmokeTempThresholdNumber(coordinator, entry),
+        AduroHighSmokeDurationThresholdNumber(coordinator, entry),
+        AduroLowWoodTempThresholdNumber(coordinator, entry),
+        AduroLowWoodDurationThresholdNumber(coordinator, entry),
     ]
 
     async_add_entities(numbers)
@@ -439,4 +443,211 @@ class AduroShutdownLevelNumber(AduroNumberBase):
 
     async def _actually_set_value(self, value: float) -> None:
         """Not used - shutdown level changes are immediate."""
+        pass
+
+class AduroHighSmokeTempThresholdNumber(AduroNumberBase):
+    """Number entity for high smoke temperature threshold."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the number entity."""
+        super().__init__(coordinator, entry, "high_smoke_temp_threshold", "High Smoke Temp Alert Threshold")
+        self._attr_icon = "mdi:thermometer-alert"
+        self._attr_mode = NumberMode.BOX
+        from .const import HIGH_SMOKE_TEMP_MIN, HIGH_SMOKE_TEMP_MAX, HIGH_SMOKE_TEMP_STEP
+        self._attr_native_min_value = HIGH_SMOKE_TEMP_MIN
+        self._attr_native_max_value = HIGH_SMOKE_TEMP_MAX
+        self._attr_native_step = HIGH_SMOKE_TEMP_STEP
+        self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current threshold."""
+        return self.coordinator._high_smoke_temp_threshold
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        attrs = {}
+        if self.coordinator.data and "operating" in self.coordinator.data:
+            current_temp = self.coordinator.data["operating"].get("smoke_temp", 0)
+            attrs["current_smoke_temp"] = current_temp
+            attrs["threshold_exceeded"] = current_temp >= self.coordinator._high_smoke_temp_threshold
+        
+        if self.coordinator.data and "alerts" in self.coordinator.data:
+            alert_info = self.coordinator.data["alerts"].get("high_smoke_temp_alert", {})
+            attrs["alert_active"] = alert_info.get("active", False)
+            if alert_info.get("time_info"):
+                attrs["time_info"] = alert_info["time_info"]
+        
+        return attrs
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the threshold temperature."""
+        temperature = float(value)
+        _LOGGER.info("Number: Setting high smoke temp threshold to %s°C", temperature)
+        
+        self.coordinator.set_high_smoke_temp_threshold(temperature)
+        await self.coordinator.async_request_refresh()
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Not used - threshold changes are immediate."""
+        pass
+
+
+class AduroHighSmokeDurationThresholdNumber(AduroNumberBase):
+    """Number entity for high smoke temperature duration threshold."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the number entity."""
+        super().__init__(coordinator, entry, "high_smoke_duration_threshold", "High Smoke Temp Alert Duration")
+        self._attr_icon = "mdi:timer-alert-outline"
+        self._attr_mode = NumberMode.BOX
+        from .const import HIGH_SMOKE_DURATION_MIN, HIGH_SMOKE_DURATION_MAX, HIGH_SMOKE_DURATION_STEP
+        self._attr_native_min_value = HIGH_SMOKE_DURATION_MIN
+        self._attr_native_max_value = HIGH_SMOKE_DURATION_MAX
+        self._attr_native_step = HIGH_SMOKE_DURATION_STEP
+        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current duration threshold."""
+        return float(self.coordinator._high_smoke_duration_threshold)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        attrs = {
+            "duration_minutes": self.coordinator._high_smoke_duration_threshold / 60,
+        }
+        
+        if self.coordinator.data and "alerts" in self.coordinator.data:
+            alert_info = self.coordinator.data["alerts"].get("high_smoke_temp_alert", {})
+            attrs["alert_active"] = alert_info.get("active", False)
+            if alert_info.get("time_info"):
+                time_info = alert_info["time_info"]
+                attrs["time_info"] = time_info
+                if time_info["state"] == "building":
+                    attrs["time_remaining_minutes"] = round(time_info["remaining"] / 60, 1)
+                elif time_info["state"] == "exceeded":
+                    attrs["time_exceeded_minutes"] = round(time_info["exceeded_by"] / 60, 1)
+        
+        return attrs
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the duration threshold."""
+        duration = int(value)
+        _LOGGER.info("Number: Setting high smoke duration threshold to %s seconds", duration)
+        
+        self.coordinator.set_high_smoke_duration_threshold(duration)
+        await self.coordinator.async_request_refresh()
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Not used - threshold changes are immediate."""
+        pass
+
+
+class AduroLowWoodTempThresholdNumber(AduroNumberBase):
+    """Number entity for low wood mode temperature threshold."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the number entity."""
+        super().__init__(coordinator, entry, "low_wood_temp_threshold", "Low Wood Temp Alert Threshold")
+        self._attr_icon = "mdi:thermometer-low"
+        self._attr_mode = NumberMode.BOX
+        from .const import LOW_WOOD_TEMP_MIN, LOW_WOOD_TEMP_MAX, LOW_WOOD_TEMP_STEP
+        self._attr_native_min_value = LOW_WOOD_TEMP_MIN
+        self._attr_native_max_value = LOW_WOOD_TEMP_MAX
+        self._attr_native_step = LOW_WOOD_TEMP_STEP
+        self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current threshold."""
+        return self.coordinator._low_wood_temp_threshold
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        attrs = {}
+        if self.coordinator.data and "operating" in self.coordinator.data:
+            current_temp = self.coordinator.data["operating"].get("shaft_temp", 0)
+            current_state = self.coordinator.data["operating"].get("state")
+            is_in_wood_mode = current_state in ["9", "14"]
+            
+            attrs["current_shaft_temp"] = current_temp
+            attrs["in_wood_mode"] = is_in_wood_mode
+            attrs["threshold_exceeded"] = is_in_wood_mode and current_temp <= self.coordinator._low_wood_temp_threshold
+        
+        if self.coordinator.data and "alerts" in self.coordinator.data:
+            alert_info = self.coordinator.data["alerts"].get("low_wood_temp_alert", {})
+            attrs["alert_active"] = alert_info.get("active", False)
+            if alert_info.get("time_info"):
+                attrs["time_info"] = alert_info["time_info"]
+        
+        return attrs
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the threshold temperature."""
+        temperature = float(value)
+        _LOGGER.info("Number: Setting low wood temp threshold to %s°C", temperature)
+        
+        self.coordinator.set_low_wood_temp_threshold(temperature)
+        await self.coordinator.async_request_refresh()
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Not used - threshold changes are immediate."""
+        pass
+
+
+class AduroLowWoodDurationThresholdNumber(AduroNumberBase):
+    """Number entity for low wood mode temperature duration threshold."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the number entity."""
+        super().__init__(coordinator, entry, "low_wood_duration_threshold", "Low Wood Temp Alert Duration")
+        self._attr_icon = "mdi:timer-outline"
+        self._attr_mode = NumberMode.BOX
+        from .const import LOW_WOOD_DURATION_MIN, LOW_WOOD_DURATION_MAX, LOW_WOOD_DURATION_STEP
+        self._attr_native_min_value = LOW_WOOD_DURATION_MIN
+        self._attr_native_max_value = LOW_WOOD_DURATION_MAX
+        self._attr_native_step = LOW_WOOD_DURATION_STEP
+        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current duration threshold."""
+        return float(self.coordinator._low_wood_duration_threshold)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        attrs = {
+            "duration_minutes": self.coordinator._low_wood_duration_threshold / 60,
+        }
+        
+        if self.coordinator.data and "alerts" in self.coordinator.data:
+            alert_info = self.coordinator.data["alerts"].get("low_wood_temp_alert", {})
+            attrs["alert_active"] = alert_info.get("active", False)
+            attrs["in_wood_mode"] = alert_info.get("in_wood_mode", False)
+            
+            if alert_info.get("time_info"):
+                time_info = alert_info["time_info"]
+                attrs["time_info"] = time_info
+                if time_info["state"] == "building":
+                    attrs["time_remaining_minutes"] = round(time_info["remaining"] / 60, 1)
+                elif time_info["state"] == "exceeded":
+                    attrs["time_exceeded_minutes"] = round(time_info["exceeded_by"] / 60, 1)
+        
+        return attrs
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the duration threshold."""
+        duration = int(value)
+        _LOGGER.info("Number: Setting low wood duration threshold to %s seconds", duration)
+        
+        self.coordinator.set_low_wood_duration_threshold(duration)
+        await self.coordinator.async_request_refresh()
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Not used - threshold changes are immediate."""
         pass
