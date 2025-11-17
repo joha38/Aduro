@@ -2,24 +2,20 @@
   "config": {
     "step": {
       "user": {
-        "title": "Konfigurera Aduro Hybridkamin",
-        "description": "Ställ in din Aduro kaminintegration",
+        "title": "Konfigurera Aduro Hybrid Kamin",
+        "description": "Ange dina kamininställningar",
         "data": {
-          "stove_model": "Kaminmodell",
-          "stove_serial": "Kaminens Serienummer",
-          "stove_pin": "Kaminen PIN-kod"
-        },
-        "data_description": {
-          "stove_model": "Välj din Aduro kaminmodell (H1, H2, H3, H4, H5 eller H6)",
-          "stove_serial": "Serienumret som finns på din kamin",
-          "stove_pin": "PIN-koden för din kamin"
+          "stove_serial": "Kamins Serienummer",
+          "stove_pin": "Kamins PIN-kod",
+          "stove_model": "Kaminmodell"
         }
       }
     },
     "error": {
-      "cannot_connect": "Kunde inte ansluta till kaminen",
-      "invalid_auth": "Ogiltiga autentiseringsuppgifter",
-      "unknown": "Oväntat fel inträffade"
+      "missing_serial": "Serienummer krävs",
+      "missing_pin": "PIN-kod krävs",
+      "cannot_connect": "Kunde inte ansluta",
+      "unknown": "Oväntat fel"
     },
     "abort": {
       "already_configured": "Denna kamin är redan konfigurerad"
@@ -28,13 +24,54 @@
   "options": {
     "step": {
       "init": {
-        "title": "Konfigurera Aduro-alternativ",
-        "description": "Uppdatera dina Aduro kamininställningar",
+        "title": "Konfigurera Aduro Kamin",
+        "description": "Välj ett konfigurationsområde",
+        "menu_options": {
+          "pellet_settings": "Pelletsinställningar",
+          "temperature_alerts": "Temperaturvarningar",
+          "advanced_settings": "Avancerade Inställningar"
+        }
+      },
+      "pellet_settings": {
+        "title": "Pelletskonfiguration",
+        "description": "Konfigurera pelletsbehållare och lågpelletvarningar",
         "data": {
-          "stove_model": "Kaminmodell"
+          "pellet_capacity": "Pelletsbehållarens Kapacitet (kg)",
+          "notification_level": "Varningsnivå för Låga Pellets (%)",
+          "shutdown_level": "Auto-avstängningsnivå (%)",
+          "auto_shutdown_enabled": "Aktivera Auto-avstängning"
         },
         "data_description": {
-          "stove_model": "Ändra din kaminmodell vid behov"
+          "pellet_capacity": "Total kapacitet för din pelletsbehållare i kilogram",
+          "notification_level": "Få en avisering när pellets sjunker under denna procent",
+          "shutdown_level": "Stäng av kaminen automatiskt när pellets sjunker under denna procent",
+          "auto_shutdown_enabled": "Tillåt kaminen att automatiskt stänga av vid låg pelletsnivå"
+        }
+      },
+      "temperature_alerts": {
+        "title": "Temperaturvarningskonfiguration",
+        "description": "Konfigurera temperaturövervakning och varningar",
+        "data": {
+          "high_smoke_temp_threshold": "Tröskelvärde för Hög Röktemperatur (°C)",
+          "high_smoke_duration_threshold": "Varaktighet för Hög Rökvarning (sekunder)",
+          "low_wood_temp_threshold": "Tröskelvärde för Låg Vedlägestemperatur (°C)",
+          "low_wood_duration_threshold": "Varaktighet för Låg Vedlägesvarning (sekunder)"
+        },
+        "data_description": {
+          "high_smoke_temp_threshold": "Utlös varning när röktemperaturen överstiger detta värde",
+          "high_smoke_duration_threshold": "Tid i sekunder temperaturen måste överstiga tröskeln innan varning",
+          "low_wood_temp_threshold": "Utlös varning när vedlägestemperaturen sjunker under detta värde",
+          "low_wood_duration_threshold": "Tid i sekunder temperaturen måste vara låg innan varning"
+        }
+      },
+      "advanced_settings": {
+        "title": "Avancerade Inställningar",
+        "description": "Konfigurera avancerade kaminbeteenden",
+        "data": {
+          "auto_resume_after_wood": "Auto-återuppta Efter Vedläge"
+        },
+        "data_description": {
+          "auto_resume_after_wood": "Återuppta pelletsdrift automatiskt med tidigare inställningar när vedläget avslutas"
         }
       }
     }
