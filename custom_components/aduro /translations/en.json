@@ -81,16 +81,25 @@
       "state": {
         "name": "State",
         "state": {
-          "state_operating": "Operating {heatlevel}",
+          "state_operating": "Power {heatlevel}",
           "state_stopped": "Stopped",
           "state_off": "Off",
-          "state_operating_iii": "Operating III"
+          "state_operating_iii": "Power III",
+          "state_stopped_draft": "Dropshaft hot",
+          "state_stopped_smoke_sensor": "Bad smoke sensor",
+          "state_stopped_dropshaft": "Bad dropshaft sensor",
+          "state_stopped_burner_yellow": "Check burner yellow",
+          "state_stopped_auger": "bad external auger output",
+          "state_stopped_timer": "Stopped by timer",
+          "state_operating_air_damper": "Air damper closed",
+          "state_stopped_co_sensor": "Co sensor defect",
+          "state_stopped_no_fan": "No power consumption for fan"
         }
       },
       "substate": {
         "name": "Substate",
         "state": {
-          "substate_waiting": "Waiting",
+          "substate_waiting": "Wait",
           "substate_ignition_1": "Ignition 1",
           "substate_ignition_2": "Ignition 2",
           "substate_normal": "Normal",
