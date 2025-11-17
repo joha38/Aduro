@@ -6,58 +6,103 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
 
-from .const import DOMAIN, PLATFORMS
+from .const import (
+    DOMAIN,
+    DEFAULT_CAPACITY_PELLETS,
+    DEFAULT_NOTIFICATION_LEVEL,
+    DEFAULT_SHUTDOWN_LEVEL,
+    DEFAULT_HIGH_SMOKE_TEMP,
+    DEFAULT_HIGH_SMOKE_DURATION,
+    DEFAULT_LOW_WOOD_TEMP,
+    DEFAULT_LOW_WOOD_DURATION,
+)
 from .coordinator import AduroCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.NUMBER,
+    Platform.BUTTON,
+]
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Aduro Hybrid Stove from a config entry."""
-    _LOGGER.debug("Setting up Aduro integration for entry: %s", entry.entry_id)
+    hass.data.setdefault(DOMAIN, {})
 
-    # Create and setup the coordinator
+    # Create coordinator
     coordinator = AduroCoordinator(hass, entry)
-
-    # Fetch initial data
+    
+    # Load saved options and apply to coordinator
+    await _load_options(coordinator, entry)
+    
+    # Perform initial data fetch
     await coordinator.async_config_entry_first_refresh()
 
-    # Store coordinator in hass.data
-    hass.data.setdefault(DOMAIN, {})
+    # Store coordinator
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     # Forward setup to platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register services
-    await async_setup_services(hass, coordinator)
-
-    # Setup update listener for options changes
-    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
-
-    _LOGGER.info("Aduro integration setup completed for %s", entry.title)
+    # Register options update listener
+    entry.async_on_unload(entry.add_update_listener(update_listener))
 
     return True
 
+async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update."""
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    await _load_options(coordinator, entry)
+    await coordinator.async_request_refresh()
+
+
+async def _load_options(coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+    """Load options and apply to coordinator."""
+    options = entry.options
+    
+    # Pellet settings
+    pellet_capacity = options.get("pellet_capacity", DEFAULT_CAPACITY_PELLETS)
+    notification_level = options.get("notification_level", DEFAULT_NOTIFICATION_LEVEL)
+    shutdown_level = options.get("shutdown_level", DEFAULT_SHUTDOWN_LEVEL)
+    auto_shutdown = options.get("auto_shutdown_enabled", False)
+    
+    coordinator.set_pellet_capacity(pellet_capacity)
+    coordinator.set_notification_level(notification_level)
+    coordinator.set_shutdown_level(shutdown_level)
+    coordinator.set_auto_shutdown_enabled(auto_shutdown)
+    
+    # Temperature alert settings
+    high_smoke_temp = options.get("high_smoke_temp_threshold", DEFAULT_HIGH_SMOKE_TEMP)
+    high_smoke_duration = options.get("high_smoke_duration_threshold", DEFAULT_HIGH_SMOKE_DURATION)
+    low_wood_temp = options.get("low_wood_temp_threshold", DEFAULT_LOW_WOOD_TEMP)
+    low_wood_duration = options.get("low_wood_duration_threshold", DEFAULT_LOW_WOOD_DURATION)
+    
+    coordinator.set_high_smoke_temp_threshold(high_smoke_temp)
+    coordinator.set_high_smoke_duration_threshold(high_smoke_duration)
+    coordinator.set_low_wood_temp_threshold(low_wood_temp)
+    coordinator.set_low_wood_duration_threshold(low_wood_duration)
+    
+    # Advanced settings
+    auto_resume_wood = options.get("auto_resume_after_wood", False)
+    coordinator.set_auto_resume_after_wood(auto_resume_wood)
+    
+    _LOGGER.info(
+        "Loaded options - Pellet: %.1fkg, Alerts: High Smoke=%.0f°C/%ds, Low Wood=%.0f°C/%ds",
+        pellet_capacity,
+        high_smoke_temp,
+        high_smoke_duration,
+        low_wood_temp,
+        low_wood_duration,
+    )
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    _LOGGER.debug("Unloading Aduro integration for entry: %s", entry.entry_id)
-
-    # Unload platforms
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-    if unload_ok:
-        # Remove coordinator from hass.data
-        coordinator = hass.data[DOMAIN].pop(entry.entry_id)
-        
-        # Clean up if this was the last entry
-        if not hass.data[DOMAIN]:
-            hass.data.pop(DOMAIN)
-            # Unregister services
-            await async_unload_services(hass)
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
 
