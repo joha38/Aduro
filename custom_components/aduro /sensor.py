@@ -280,16 +280,77 @@ class AduroMainStatusSensor(AduroSensorBase):
 
 
 class AduroSubStatusSensor(AduroSensorBase):
-    """Sensor for sub status text."""
+    """Sensor for sub status text with live timer countdown."""
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "status_sub", "Status Sub")
         self._attr_icon = "mdi:information-outline"
+        self._timer_update_task = None
+
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass."""
+        await super().async_added_to_hass()
+        # Start the timer update loop
+        self._timer_update_task = self.hass.async_create_task(
+            self._async_timer_update_loop()
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """When entity is being removed from hass."""
+        # Cancel the timer update task
+        if self._timer_update_task:
+            self._timer_update_task.cancel()
+        await super().async_will_remove_from_hass()
+
+    async def _async_timer_update_loop(self) -> None:
+        """Update the sensor every second when timer is active."""
+        import asyncio
+        
+        while True:
+            try:
+                await asyncio.sleep(1)
+                
+                # Check if we should update
+                if self._should_update_timer():
+                    self.async_write_ha_state()
+                    
+            except asyncio.CancelledError:
+                break
+            except Exception as err:
+                _LOGGER.error("Error in timer update loop: %s", err)
+
+    def _should_update_timer(self) -> bool:
+        """Check if timer is active and needs updating."""
+        if not self.coordinator.data or "operating" not in self.coordinator.data:
+            return False
+        
+        state = self.coordinator.data["operating"].get("state")
+        
+        # Timer is active during state 2 or 4
+        return state in ["2", "4"]
+
+    def _get_live_remaining_time(self, state: str) -> int | None:
+        """Calculate live remaining time for current state."""
+        from datetime import datetime
+        from .const import TIMER_STARTUP_1, TIMER_STARTUP_2
+        
+        try:
+            if state == "2" and self.coordinator._timer_startup_1_started:
+                elapsed = (datetime.now() - self.coordinator._timer_startup_1_started).total_seconds()
+                return max(0, TIMER_STARTUP_1 - int(elapsed))
+            
+            elif state == "4" and self.coordinator._timer_startup_2_started:
+                elapsed = (datetime.now() - self.coordinator._timer_startup_2_started).total_seconds()
+                return max(0, TIMER_STARTUP_2 - int(elapsed))
+        except (TypeError, AttributeError) as err:
+            _LOGGER.debug("Error calculating live timer: %s", err)
+        
+        return None
 
     @property
     def native_value(self) -> str | None:
-        """Return the sub status text."""
+        """Return the sub status text with live timer countdown."""
         if not self.coordinator.data or "operating" not in self.coordinator.data:
             return None
         
@@ -299,8 +360,6 @@ class AduroSubStatusSensor(AduroSensorBase):
         # Check for combined state_substate first
         combined_key = f"{state}_{substate}"
         if combined_key in SUBSTATE_NAMES:
-            # Get translation key
-            # For now use display version
             from .const import SUBSTATE_NAMES_DISPLAY
             status = SUBSTATE_NAMES_DISPLAY.get(combined_key, f"Unknown State {state}/{substate}")
         else:
@@ -315,17 +374,13 @@ class AduroSubStatusSensor(AduroSensorBase):
                     state, substate
                 )
         
-        # Add timer info if applicable
-        if state == "2" and "timers" in self.coordinator.data:
-            remaining = self.coordinator.data["timers"].get("startup_1_remaining", 0)
-            minutes = remaining // 60
-            seconds = remaining % 60
-            return f"{status} ({minutes:02d}:{seconds:02d})"
-        elif state == "4" and "timers" in self.coordinator.data:
-            remaining = self.coordinator.data["timers"].get("startup_2_remaining", 0)
-            minutes = remaining // 60
-            seconds = remaining % 60
-            return f"{status} ({minutes:02d}:{seconds:02d})"
+        # Add LIVE timer info if applicable
+        if state in ["2", "4"]:
+            remaining = self._get_live_remaining_time(state)
+            if remaining is not None:
+                minutes = remaining // 60
+                seconds = remaining % 60
+                return f"{status} ({minutes:02d}:{seconds:02d})"
         
         return status
 
