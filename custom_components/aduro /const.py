@@ -162,7 +162,7 @@ STATE_NAMES_DISPLAY: Final = {
     "5": "Operating {heatlevel}",
     "6": "Stopped",
     "9": "Off",
-    "11": "Dropshaft hot"
+    "11": "Dropshaft hot",
     "13": "Stopped",
     "14": "Off",
     "15": "Bad smoke sensor",
