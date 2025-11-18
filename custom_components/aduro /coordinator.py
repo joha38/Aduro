@@ -174,6 +174,11 @@ class AduroCoordinator(DataUpdateCoordinator):
                 consumption_data = await self._async_get_consumption_data()
                 if consumption_data:
                     data.update(consumption_data)
+            else:
+                # Preserve existing consumption data if we're not updating it
+                if self.data and "consumption" in self.data:
+                    data["consumption"] = self.data["consumption"]
+                    _LOGGER.debug("Preserving existing consumption data")
             
             # Process state changes and auto-actions
             _LOGGER.debug("Processing state changes")
@@ -202,7 +207,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             
             # Check temperature alert conditions
             _LOGGER.debug("Checking temperature alerts")
-            self._check_temperature_alerts(data)
+            await self._check_temperature_alerts(data)
 
             # Add calculated/derived data
             _LOGGER.debug("Adding calculated data")
@@ -996,6 +1001,17 @@ class AduroCoordinator(DataUpdateCoordinator):
         try:
             from datetime import date
             
+            # Initialize with empty structures
+            consumption_data = {
+                "day": 0,
+                "yesterday": 0,
+                "month": 0,
+                "year": 0,
+                "monthly_history": {},
+                "yearly_history": {},
+                "year_from_stove": 0,
+            }
+            
             # Get daily consumption
             response = await self.hass.async_add_executor_job(
                 raw.run,
@@ -1012,10 +1028,8 @@ class AduroCoordinator(DataUpdateCoordinator):
             today = date.today().day
             yesterday = (date.today() - timedelta(1)).day
             
-            consumption_data = {
-                "day": float(data[today - 1]) if len(data) >= today else 0,
-                "yesterday": float(data[yesterday - 1]) if len(data) >= yesterday else 0,
-            }
+            consumption_data["day"] = float(data[today - 1]) if len(data) >= today else 0
+            consumption_data["yesterday"] = float(data[yesterday - 1]) if len(data) >= yesterday else 0
             
             # Get monthly consumption
             response = await self.hass.async_add_executor_job(
@@ -1031,9 +1045,31 @@ class AduroCoordinator(DataUpdateCoordinator):
             data[0] = data[0][13:]  # Remove "total_months" prefix
             
             month = date.today().month
+            current_year = date.today().year
             consumption_data["month"] = float(data[month - 1]) if len(data) >= month else 0
             
-            # Get yearly consumption
+            # Store all monthly data with historical tracking
+            monthly_history = {}
+            month_names = [
+                "january", "february", "march", "april", "may", "june",
+                "july", "august", "september", "october", "november", "december"
+            ]
+            
+            for i, month_name in enumerate(month_names):
+                if i < len(data):
+                    monthly_history[month_name] = float(data[i])
+            
+            consumption_data["monthly_history"] = monthly_history
+            
+            # Calculate year-to-date from monthly totals
+            year_to_date = sum(float(val) for val in data if float(val) > 0.002)  # Exclude default 0.002 values
+            
+            _LOGGER.info(
+                f"Yearly consumption calculated from months: {year_to_date:.2f} kg "
+                f"(months with data: {sum(1 for val in data if float(val) > 0.002)})"
+            )
+            
+            # Try to get yearly data from stove (for reference)
             response = await self.hass.async_add_executor_job(
                 raw.run,
                 self.stove_ip,
@@ -1046,9 +1082,22 @@ class AduroCoordinator(DataUpdateCoordinator):
             data = response.parse_payload().split(',')
             data[0] = data[0][12:]  # Remove "total_years" prefix
             
-            year = date.today().year
-            data_position = year - (year - (len(data) - 1))
-            consumption_data["year"] = float(data[data_position]) if len(data) > data_position else 0
+            # Store yearly history (even if zeros, for future reference)
+            yearly_history = {}
+            base_year = 2013  # Stove started tracking from 2013
+            for i in range(len(data)):
+                year_label = base_year + i
+                yearly_history[str(year_label)] = float(data[i])
+            
+            consumption_data["yearly_history"] = yearly_history
+            
+            # Use calculated year-to-date as the primary yearly value
+            consumption_data["year"] = year_to_date
+            
+            # Also store the stove's reported yearly value (if different)
+            year_position = current_year % len(data)
+            stove_yearly_value = float(data[year_position]) if len(data) > year_position else 0
+            consumption_data["year_from_stove"] = stove_yearly_value
             
             self._last_consumption_update = datetime.now()
             return {"consumption": consumption_data}
