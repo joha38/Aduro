@@ -219,7 +219,7 @@ To customize settings after setup:
 - **Auto-Shutdown Pellet Level** - Shutdown threshold (%)
 
 #### Temperature Alert Configuration
-- **High Smoke Temp Alert Threshold** - Alert threshold (350-500°C)
+- **High Smoke Temp Alert Threshold** - Alert threshold (300-450°C)
 - **High Smoke Temp Alert Duration threshold** - Alert duration threshold (60-1800 seconds)
 - **Low Wood Temp Alert Threshold** - Alert threshold (20-200°C)
 - **Low Wood Temp Alert Duration threshold** - Alert duration threshold (60-1800 seconds)
