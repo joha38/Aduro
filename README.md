@@ -424,7 +424,7 @@ automation:
 - Verify smoke and shaft temperature sensors are working
 - Check that alert thresholds are appropriate for your stove
 - Review logs for temperature detection messages
-- Default thresholds (425°C for high smoke, 175°C for low wood) may need adjustment
+- Default thresholds (370°C for high smoke, 175°C for low wood) may need adjustment
 
 ### Unknown States
 
