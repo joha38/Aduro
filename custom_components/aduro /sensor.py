@@ -75,6 +75,7 @@ async def async_setup_entry(
         AduroConsumptionYearSensor(coordinator, entry),
         AduroMonthlyHistorySensor(coordinator, entry),
         AduroYearlyHistorySensor(coordinator, entry),
+        AduroYearOverYearSensor(coordinator, entry),
         
         # Network sensors
         AduroStoveIPSensor(coordinator, entry),
@@ -750,9 +751,14 @@ class AduroMonthlyHistorySensor(AduroSensorBase):
         attrs = dict(history)
         # Add year total
         attrs["year_total"] = round(sum(history.values()), 2)
+        
+        # Add historical snapshots for comparison
+        snapshots = consumption.get("monthly_snapshots", {})
+        if snapshots:
+            attrs["snapshots"] = snapshots
+        
         return attrs
-
-
+        
 class AduroYearlyHistorySensor(AduroSensorBase):
     """Sensor showing yearly consumption history."""
 
@@ -796,6 +802,75 @@ class AduroYearlyHistorySensor(AduroSensorBase):
         
         return history
         
+
+class AduroYearOverYearSensor(AduroSensorBase):
+    """Sensor showing year-over-year consumption comparison."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "year_over_year", "Consumption Year Over Year")
+        self._attr_icon = "mdi:grain"
+  
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        if not super().available:
+            return False
+        if not self.coordinator.data or "consumption" not in self.coordinator.data:
+            return False
+        # Only available if we have year-over-year data
+        consumption = self.coordinator.data["consumption"]
+        return "year_over_year" in consumption
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the percentage change."""
+        if not self.coordinator.data or "consumption" not in self.coordinator.data:
+            return None
+        
+        consumption = self.coordinator.data["consumption"]
+        yoy = consumption.get("year_over_year", {})
+        
+        if not yoy:
+            return None
+        
+        percentage = yoy.get("percentage_change", 0)
+        return f"{percentage:+.1f}%"
+
+    @property
+    def icon(self) -> str:
+        """Return icon based on trend."""
+        if not self.coordinator.data or "consumption" not in self.coordinator.data:
+            return "mdi:chart-line"
+        
+        consumption = self.coordinator.data["consumption"]
+        yoy = consumption.get("year_over_year", {})
+        percentage = yoy.get("percentage_change", 0)
+        
+        if percentage > 10:
+            return "mdi:trending-up"
+        elif percentage < -10:
+            return "mdi:trending-down"
+        return "mdi:trending-neutral"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return year-over-year comparison details."""
+        if not self.coordinator.data or "consumption" not in self.coordinator.data:
+            return {}
+        
+        consumption = self.coordinator.data["consumption"]
+        yoy = consumption.get("year_over_year", {})
+        
+        if not yoy:
+            return {}
+        
+        # Also include all historical snapshots for reference
+        snapshots = consumption.get("monthly_snapshots", {})
+        attrs = dict(yoy)
+        attrs["all_snapshots"] = snapshots
+        
+        return attrs
 
 # =============================================================================
 # Network Sensors
