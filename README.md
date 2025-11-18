@@ -122,7 +122,7 @@ To customize settings after setup:
 
 #### Temperature Alerts ⭐ NEW
 - **High Smoke Temperature Alert**
-  - Threshold: 350-500°C (default: 425°C)
+  - Threshold: 300-450°C (default: 370°C)
   - Duration threshold: 1-30 minutes (default: 30 seconds)
   - Alerts when smoke temperature is dangerously high
 - **Low Wood Mode Temperature Alert**
