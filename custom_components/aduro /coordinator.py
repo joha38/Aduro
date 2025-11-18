@@ -82,20 +82,18 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Pellet tracking
         self._pellet_capacity = 9.5  # kg, configurable
-        self._pellets_consumed = 0.0  # kg
+        self._pellets_consumed = 0.0  # kg - accumulated from daily increments
         self._refill_counter = 0
-        self._last_consumption_update: datetime | None = None
         self._notification_level = 10  # % remaining when to notify
         self._shutdown_level = 5  # % remaining when to auto-shutdown
-        self._auto_shutdown_enabled = False  # User preference
+        self._auto_shutdown_enabled = False
         self._shutdown_notification_sent = False
         self._low_pellet_notification_sent = False
-        
-        # Daily consumption tracking for pellet calculation
-        self._consumption_at_refill = 0.0  # Daily consumption when refilled
-        self._days_since_refill = 0  # Track day changes
-        self._last_consumption_day: date | None = None  # Track which day we're on
-        self._accumulated_consumption = 0.0  # Running total since refill
+
+        # Daily consumption tracking
+        self._consumption_at_refill = 0.0  # Last seen daily consumption value (baseline)
+        self._days_since_refill = 0
+        self._last_consumption_day: date | None = None
         
         # Wood mode tracking
         self._auto_resume_after_wood = False  # User preference
@@ -105,7 +103,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._pre_wood_mode_operation_mode: int | None = None
 
         # Temperature alert tracking
-        self._high_smoke_temp_threshold = 420.0  # °C
+        self._high_smoke_temp_threshold = 370.0  # °C
         self._high_smoke_duration_threshold = 30  # seconds
         self._high_smoke_temp_start_time: datetime | None = None
         self._high_smoke_alert_active = False
@@ -279,141 +277,186 @@ class AduroCoordinator(DataUpdateCoordinator):
         _LOGGER.debug("Fast polling enabled for %d updates", self._fast_poll_count)
 
     async def _process_state_changes(self, data: dict[str, Any]) -> None:
-        """Process state changes and trigger auto-actions."""
-        if "operating" not in data:
-            return
-        
-        current_state = data["operating"].get("state")
-        current_heatlevel = data["operating"].get("heatlevel")
-        current_operation_mode = data["status"].get("operation_mode")
-        current_temperature_ref = data["operating"].get("boiler_ref")
-        
-        _LOGGER.debug(
-            "State change check - Previous HL: %s, Current HL: %s, Previous Mode: %s, Current Mode: %s, Change in progress: %s",
-            self._previous_heatlevel,
-            current_heatlevel,
-            self._previous_operation_mode,
-            current_operation_mode,
-            self._change_in_progress
-        )
-
-        # Track wood mode transitions
-        is_in_wood_mode = current_state in ["9", "14"]
-        
-        # Entering wood mode - save current settings AND trigger auto-resume if enabled
-        if is_in_wood_mode and not self._was_in_wood_mode:
-            _LOGGER.info("Entering wood mode (state: %s), saving pellet mode settings", current_state)
-            self._pre_wood_mode_operation_mode = current_operation_mode
-            self._pre_wood_mode_heatlevel = current_heatlevel
-            self._pre_wood_mode_temperature = current_temperature_ref
-            self._was_in_wood_mode = True
+            """Process state changes and trigger auto-actions."""
+            if "operating" not in data:
+                return
             
-            # NEW: Trigger auto-resume immediately when entering wood mode
-            if self._auto_resume_after_wood:
-                _LOGGER.info("Auto-resume enabled, sending resume command to stove")
-                success = await self._async_resume_pellet_operation()
-                if success:
-                    data["auto_resume_commanded"] = True
-                else:
-                    _LOGGER.error("Failed to send auto-resume command")
-        
-        # Exiting wood mode - just clear the flag
-        if not is_in_wood_mode and self._was_in_wood_mode:
-            _LOGGER.info("Exiting wood mode, was in state: %s", self._previous_state)
-            self._was_in_wood_mode = False
+            current_state = data["operating"].get("state")
+            current_heatlevel = data["operating"].get("heatlevel")
+            current_operation_mode = data["status"].get("operation_mode")
+            current_temperature_ref = data["operating"].get("boiler_ref")
+            
+            _LOGGER.debug(
+                "State change check - Previous HL: %s, Current HL: %s, Previous Mode: %s, Current Mode: %s, Change in progress: %s",
+                self._previous_heatlevel,
+                current_heatlevel,
+                self._previous_operation_mode,
+                current_operation_mode,
+                self._change_in_progress
+            )
 
-        # Initialize previous values on first run
-        if self._previous_heatlevel is None:
+            # Track wood mode transitions
+            is_in_wood_mode = current_state in ["9", "14"]
+            
+            # Entering wood mode - save current settings AND trigger auto-resume if enabled
+            if is_in_wood_mode and not self._was_in_wood_mode:
+                _LOGGER.info("Entering wood mode (state: %s), saving pellet mode settings", current_state)
+                self._pre_wood_mode_operation_mode = current_operation_mode
+                self._pre_wood_mode_heatlevel = current_heatlevel
+                self._pre_wood_mode_temperature = current_temperature_ref
+                self._was_in_wood_mode = True
+                
+                # NEW: Trigger auto-resume immediately when entering wood mode
+                if self._auto_resume_after_wood:
+                    _LOGGER.info("Auto-resume enabled, sending resume command to stove")
+                    success = await self._async_resume_pellet_operation()
+                    if success:
+                        data["auto_resume_commanded"] = True
+                    else:
+                        _LOGGER.error("Failed to send auto-resume command")
+            
+            # Exiting wood mode - just clear the flag
+            if not is_in_wood_mode and self._was_in_wood_mode:
+                _LOGGER.info("Exiting wood mode, was in state: %s", self._previous_state)
+                self._was_in_wood_mode = False
+
+            # Initialize previous values on first run
+            if self._previous_heatlevel is None:
+                self._previous_heatlevel = current_heatlevel
+                self._previous_temperature = current_temperature_ref
+                self._previous_operation_mode = current_operation_mode
+                _LOGGER.debug("Initialized previous values on first run")
+                # Don't detect changes on first run
+                self._previous_state = current_state
+                data["app_change_detected"] = False
+                return
+
+            # =========================================================================
+            # CRITICAL: Check for external stop command FIRST
+            # =========================================================================
+            if (self._previous_state is not None and 
+                current_state in SHUTDOWN_STATES and 
+                self._previous_state not in SHUTDOWN_STATES):
+                
+                _LOGGER.info("Stove stopped externally, state: %s", current_state)
+                data["auto_stop_detected"] = True
+                
+                # CRITICAL FIX: Clear ALL pending changes and targets when externally stopped
+                if self._change_in_progress or self._toggle_heat_target:
+                    _LOGGER.warning(
+                        "Clearing pending changes due to external stop command - "
+                        "was targeting: HL=%s, Temp=%s, Mode=%s",
+                        self._target_heatlevel,
+                        self._target_temperature,
+                        self._target_operation_mode
+                    )
+                
+                # Clear all change tracking flags
+                self._change_in_progress = False
+                self._toggle_heat_target = False
+                self._mode_change_started = None
+                self._resend_attempt = 0
+                
+                # Clear all targets
+                self._target_heatlevel = None
+                self._target_temperature = None
+                self._target_operation_mode = None
+                
+                # Update previous state immediately to prevent further processing
+                self._previous_state = current_state
+                self._previous_heatlevel = current_heatlevel
+                self._previous_temperature = current_temperature_ref
+                self._previous_operation_mode = current_operation_mode
+                
+                # Mark that no app change should be detected since we're handling the stop
+                data["app_change_detected"] = False
+                
+                _LOGGER.info("All pending commands cleared - stove will remain off")
+                return
+
+            # Detect external changes (from app)
+            app_change_detected = False
+            
+            # Always check for changes and update targets, but only flag as "app_change" when not in progress
+            if current_operation_mode == 0:  # Heatlevel mode
+                if (self._previous_heatlevel is not None and 
+                    current_heatlevel != self._previous_heatlevel):
+                    if not self._change_in_progress:
+                        app_change_detected = True
+                    _LOGGER.info(
+                        "External heatlevel change detected: %s -> %s (power_pct: %d%%)",
+                        self._previous_heatlevel,
+                        current_heatlevel,
+                        data["operating"].get("power_pct", 0)
+                    )
+                    # Always update our target to match current value
+                    self._target_heatlevel = current_heatlevel
+                    
+            elif current_operation_mode == 1:  # Temperature mode
+                if (self._previous_temperature is not None and 
+                    current_temperature_ref != self._previous_temperature):
+                    if not self._change_in_progress:
+                        app_change_detected = True
+                    _LOGGER.info("External temperature change detected: %s -> %s", 
+                            self._previous_temperature, current_temperature_ref)
+                    # Always update our target to match current value
+                    self._target_temperature = current_temperature_ref
+            
+            # Detect operation mode changes
+            if (self._previous_operation_mode is not None and 
+                current_operation_mode != self._previous_operation_mode):
+                if not self._change_in_progress:
+                    app_change_detected = True
+                _LOGGER.info("External operation mode change detected: %s -> %s",
+                        self._previous_operation_mode, current_operation_mode)
+                self._target_operation_mode = current_operation_mode
+                
+            else:
+                # When change is in progress, don't flag as app change
+                _LOGGER.debug("Change in progress, skipping app change detection")
+            
+            # Auto turn on when stove starts
+            if (self._previous_state is not None and 
+                current_state in STARTUP_STATES and 
+                self._previous_state not in STARTUP_STATES):
+                _LOGGER.info("Stove started, state: %s", current_state)
+                data["auto_start_detected"] = True
+            
+            # Start timers based on state
+            if current_state == "2" and self._previous_state != "2":
+                self._timer_startup_1_started = datetime.now()
+                _LOGGER.debug("Started startup timer 1")
+            
+            if current_state == "4" and self._previous_state != "4":
+                self._timer_startup_2_started = datetime.now()
+                _LOGGER.debug("Started startup timer 2")
+
+            # Update targets to match current values when external change detected
+            if app_change_detected:
+                if current_operation_mode == 0:
+                    self._target_heatlevel = current_heatlevel
+                    self._target_operation_mode = 0
+                elif current_operation_mode == 1:
+                    self._target_temperature = current_temperature_ref
+                    self._target_operation_mode = 1
+                
+                # ADDED: Clear change_in_progress when external change is detected
+                # This prevents resending old commands
+                if self._change_in_progress:
+                    _LOGGER.info("External change detected - clearing change_in_progress flag")
+                    self._change_in_progress = False
+                    self._toggle_heat_target = False
+                    self._mode_change_started = None
+                    self._resend_attempt = 0
+
+            # Update previous values
+            self._previous_state = current_state
             self._previous_heatlevel = current_heatlevel
             self._previous_temperature = current_temperature_ref
             self._previous_operation_mode = current_operation_mode
-            _LOGGER.debug("Initialized previous values on first run")
-            # Don't detect changes on first run
-            self._previous_state = current_state
-            data["app_change_detected"] = False
-            return
-
-        # Detect external changes (from app)
-        app_change_detected = False
-        
-        # Always check for changes and update targets, but only flag as "app_change" when not in progress
-        if current_operation_mode == 0:  # Heatlevel mode
-            if (self._previous_heatlevel is not None and 
-                current_heatlevel != self._previous_heatlevel):
-                if not self._change_in_progress:
-                    app_change_detected = True
-                _LOGGER.info(
-                    "External heatlevel change detected: %s -> %s (power_pct: %d%%)",
-                    self._previous_heatlevel,
-                    current_heatlevel,
-                    data["operating"].get("power_pct", 0)
-                )
-                # Always update our target to match current value
-                self._target_heatlevel = current_heatlevel
-                
-        elif current_operation_mode == 1:  # Temperature mode
-            if (self._previous_temperature is not None and 
-                current_temperature_ref != self._previous_temperature):
-                if not self._change_in_progress:
-                    app_change_detected = True
-                _LOGGER.info("External temperature change detected: %s -> %s", 
-                        self._previous_temperature, current_temperature_ref)
-                # Always update our target to match current value
-                self._target_temperature = current_temperature_ref
-        
-        # Detect operation mode changes
-        if (self._previous_operation_mode is not None and 
-            current_operation_mode != self._previous_operation_mode):
-            if not self._change_in_progress:
-                app_change_detected = True
-            _LOGGER.info("External operation mode change detected: %s -> %s",
-                    self._previous_operation_mode, current_operation_mode)
-            self._target_operation_mode = current_operation_mode
             
-        else:
-            # When change is in progress, don't flag as app change
-            _LOGGER.debug("Change in progress, skipping app change detection")
-        
-        # Auto turn off when stove stops
-        if (self._previous_state is not None and 
-            current_state in SHUTDOWN_STATES and 
-            self._previous_state not in SHUTDOWN_STATES):
-            _LOGGER.info("Stove stopped, state: %s", current_state)
-            data["auto_stop_detected"] = True
-        
-        # Auto turn on when stove starts
-        if (self._previous_state is not None and 
-            current_state in STARTUP_STATES and 
-            self._previous_state not in STARTUP_STATES):
-            _LOGGER.info("Stove started, state: %s", current_state)
-            data["auto_start_detected"] = True
-        
-        # Start timers based on state
-        if current_state == "2" and self._previous_state != "2":
-            self._timer_startup_1_started = datetime.now()
-            _LOGGER.debug("Started startup timer 1")
-        
-        if current_state == "4" and self._previous_state != "4":
-            self._timer_startup_2_started = datetime.now()
-            _LOGGER.debug("Started startup timer 2")
-
-        # Update targets to match current values when external change detected
-        if app_change_detected:
-            if current_operation_mode == 0:
-                self._target_heatlevel = current_heatlevel
-                self._target_operation_mode = 0
-            elif current_operation_mode == 1:
-                self._target_temperature = current_temperature_ref
-                self._target_operation_mode = 1
-
-        # Update previous values
-        self._previous_state = current_state
-        self._previous_heatlevel = current_heatlevel
-        self._previous_temperature = current_temperature_ref
-        self._previous_operation_mode = current_operation_mode
-        
-        # Add detection flag to data
-        data["app_change_detected"] = app_change_detected
+            # Add detection flag to data
+            data["app_change_detected"] = app_change_detected
 
     async def _check_mode_change_progress(self, data: dict[str, Any]) -> None:
         """Check if mode change is complete and handle retries."""
@@ -423,9 +466,25 @@ class AduroCoordinator(DataUpdateCoordinator):
         if "operating" not in data or "status" not in data:
             return
         
+        current_state = data["operating"].get("state")
         current_heatlevel = data["operating"].get("heatlevel")
         current_temperature_ref = data["operating"].get("boiler_ref")
         current_operation_mode = data["status"].get("operation_mode")
+        
+        # ADDED: If stove is in shutdown state, abort any pending changes
+        if current_state in SHUTDOWN_STATES:
+            _LOGGER.warning(
+                "Stove is in shutdown state (%s) - aborting pending mode change",
+                current_state
+            )
+            self._change_in_progress = False
+            self._toggle_heat_target = False
+            self._mode_change_started = None
+            self._resend_attempt = 0
+            self._target_heatlevel = None
+            self._target_temperature = None
+            self._target_operation_mode = None
+            return
         
         # Check if change is complete
         change_complete = True
@@ -487,6 +546,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self._toggle_heat_target = False
                 self._mode_change_started = None
                 self._resend_attempt = 0
+                # ADDED: Clear targets on timeout
+                self._target_heatlevel = None
+                self._target_temperature = None
+                self._target_operation_mode = None
 
     async def _resend_pending_commands(self) -> None:
         """Resend pending commands that haven't been confirmed."""
@@ -556,10 +619,10 @@ class AduroCoordinator(DataUpdateCoordinator):
         data["timers"] = timers
 
     def _calculate_pellet_levels(self, data: dict[str, Any]) -> None:
-        """Calculate pellet levels and remaining amount."""
+        """Calculate pellet levels based on daily consumption increments."""
         from datetime import date
         
-        # Update consumed pellets based on daily consumption
+        # Get today's consumption from sensor
         if "consumption" in data:
             today_consumption = data["consumption"].get("day", 0)
             current_day = date.today()
@@ -568,56 +631,49 @@ class AduroCoordinator(DataUpdateCoordinator):
             if self._last_consumption_day is None:
                 self._last_consumption_day = current_day
                 self._consumption_at_refill = today_consumption
-                self._accumulated_consumption = 0.0
                 _LOGGER.debug(
-                    "Initialized daily consumption tracking: today=%.2f kg, date=%s",
+                    "Initialized consumption tracking: baseline=%.2f kg, date=%s",
                     today_consumption,
                     current_day
                 )
             
-            # Check if day changed (midnight rollover)
+            # Detect midnight reset (day changed and consumption decreased)
             if current_day != self._last_consumption_day:
                 _LOGGER.info(
-                    "Day changed from %s to %s, adding yesterday's consumption to accumulated total",
+                    "Day changed from %s to %s - consumption reset detected",
                     self._last_consumption_day,
                     current_day
                 )
                 
-                # Get yesterday's consumption from data
-                yesterday_consumption = data["consumption"].get("yesterday", 0)
-                
-                # Add completed day's consumption to accumulated total
-                self._accumulated_consumption += yesterday_consumption
-                
-                # Reset baseline for new day
-                self._consumption_at_refill = 0.0
+                # The daily sensor has reset to 0, start fresh
                 self._last_consumption_day = current_day
+                self._consumption_at_refill = 0.0
                 self._days_since_refill += 1
                 
                 _LOGGER.debug(
-                    "New day started - accumulated: %.2f kg, days since refill: %d",
-                    self._accumulated_consumption,
+                    "New day started - pellets consumed so far: %.2f kg, days since refill: %d",
+                    self._pellets_consumed,
                     self._days_since_refill
                 )
             
-            # Calculate today's consumption since refill (or since midnight)
-            today_since_baseline = max(0, today_consumption - self._consumption_at_refill)
+            # Calculate increment since last baseline (or since midnight)
+            increment = max(0, today_consumption - self._consumption_at_refill)
             
-            # Total consumed = accumulated from previous days + today's consumption
-            self._pellets_consumed = self._accumulated_consumption + today_since_baseline
-            
-            _LOGGER.debug(
-                "Pellet consumption: %.2f kg (accumulated: %.2f kg, today: %.2f kg, baseline: %.2f kg)",
-                self._pellets_consumed,
-                self._accumulated_consumption,
-                today_since_baseline,
-                self._consumption_at_refill
-            )
+            # Add increment to total consumed
+            if increment > 0:
+                self._pellets_consumed += increment
+                self._consumption_at_refill = today_consumption
+                
+                _LOGGER.debug(
+                    "Consumption increment: +%.2f kg (total: %.2f kg, today: %.2f kg)",
+                    increment,
+                    self._pellets_consumed,
+                    today_consumption
+                )
         
         # Calculate remaining pellets
-        amount_remaining = self._pellet_capacity - self._pellets_consumed
-        percentage_remaining = ((self._pellet_capacity - self._pellets_consumed) / 
-                               self._pellet_capacity * 100) if self._pellet_capacity > 0 else 0
+        amount_remaining = max(0, self._pellet_capacity - self._pellets_consumed)
+        percentage_remaining = (amount_remaining / self._pellet_capacity * 100) if self._pellet_capacity > 0 else 0
         
         pellets = {
             "capacity": self._pellet_capacity,
@@ -628,7 +684,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             "notification_level": self._notification_level,
             "shutdown_level": self._shutdown_level,
             "auto_shutdown_enabled": self._auto_shutdown_enabled,
-            "days_since_refill": self._days_since_refill,  # Extra info
+            "days_since_refill": self._days_since_refill,
         }
         
         data["pellets"] = pellets
@@ -1056,7 +1112,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             today_consumption = self.data["consumption"].get("day", 0)
             self._consumption_at_refill = today_consumption
             _LOGGER.info(
-                "Pellets refilled, baseline set to today's consumption: %.2f kg",
+                "Pellets refilled, baseline set to current daily consumption: %.2f kg",
                 today_consumption
             )
         else:
@@ -1064,7 +1120,6 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Reset all tracking
         self._pellets_consumed = 0.0
-        self._accumulated_consumption = 0.0
         self._days_since_refill = 0
         self._last_consumption_day = date.today()
         self._refill_counter += 1
@@ -1072,8 +1127,9 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._shutdown_notification_sent = False
         
         _LOGGER.info(
-            "Pellets refilled, counter: %d, starting fresh from day: %s",
+            "Pellets refilled - counter: %d, capacity: %.1f kg, date: %s",
             self._refill_counter,
+            self._pellet_capacity,
             self._last_consumption_day
         )
 
@@ -1176,9 +1232,9 @@ class AduroCoordinator(DataUpdateCoordinator):
         """Internal method to command the stove to auto-resume pellet operation after wood mode."""
         _LOGGER.info(
             "Commanding stove to auto-resume pellet operation - Mode: %s, Heatlevel: %s, Temperature: %s",
-            self._pre_wood_mode_operation_mode,
-            self._pre_wood_mode_heatlevel,
-            self._pre_wood_mode_temperature
+            #self._pre_wood_mode_operation_mode,
+            #self._pre_wood_mode_heatlevel,
+            #self._pre_wood_mode_temperature
         )
         
         # Send start command - this puts stove in waiting state during wood mode
