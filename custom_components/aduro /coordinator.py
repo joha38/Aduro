@@ -1067,13 +1067,36 @@ class AduroCoordinator(DataUpdateCoordinator):
             
             consumption_data["monthly_history"] = monthly_history
             
+            # Initialize snapshots for all months if not already done
+            # This allows us to start tracking immediately
+            if not hasattr(self, '_snapshots_initialized') or not self._snapshots_initialized:
+                _LOGGER.info("Initializing consumption snapshots from current data")
+                for i, month_name in enumerate(month_names):
+                    if i < len(data):
+                        value = float(data[i])
+                        # Only save if there's real consumption data (not just 0.002 default)
+                        if value > 0.002:
+                            # For months after current month, assume it's from last year
+                            # For months before or equal to current month, assume current year
+                            if i + 1 > current_month:
+                                # Future months in array are from last year
+                                snapshot_key = f"{current_year - 1}_{month_name}"
+                            else:
+                                # Past/current months are from this year
+                                snapshot_key = f"{current_year}_{month_name}"
+                            
+                            self._consumption_snapshots[snapshot_key] = value
+                            _LOGGER.debug(f"Initialized snapshot: {snapshot_key} = {value:.2f} kg")
+                
+                self._snapshots_initialized = True
+            
             # Save snapshot of current month for historical comparison
             # This preserves the exact consumption values at the end of each month
             current_month_name = month_names[current_month - 1]
             snapshot_key = f"{current_year}_{current_month_name}"
             current_month_value = float(data[current_month - 1]) if current_month - 1 < len(data) else 0
             
-            # Only update snapshot if we have a real value (not just initialization value of 0.002)
+            # Update current month snapshot
             if current_month_value > 0.002:
                 self._consumption_snapshots[snapshot_key] = current_month_value
             
@@ -1110,11 +1133,20 @@ class AduroCoordinator(DataUpdateCoordinator):
             consumption_data["monthly_history"] = monthly_history
             
             # Calculate year-to-date from monthly totals
-            year_to_date = sum(float(val) for val in data if float(val) > 0.002)  # Exclude default 0.002 values
+            # Only sum months from January through current month (exclude future months which are from last year)
+            year_to_date = 0
+            months_included = []
+            
+            for i in range(current_month):  # 0 to current_month-1 (e.g., 0-10 for November)
+                if i < len(data):
+                    value = float(data[i])
+                    if value > 0.002:  # Exclude default 0.002 values
+                        year_to_date += value
+                        months_included.append(month_names[i])
             
             _LOGGER.info(
-                f"Yearly consumption calculated from months: {year_to_date:.2f} kg "
-                f"(months with data: {sum(1 for val in data if float(val) > 0.002)})"
+                f"Yearly consumption calculated for {current_year}: {year_to_date:.2f} kg "
+                f"(months: {', '.join(months_included)})"
             )
             
             # Try to get yearly data from stove (for reference)
