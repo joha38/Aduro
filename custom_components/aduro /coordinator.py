@@ -10,6 +10,7 @@ from pyduro.actions import discover, get, set, raw, STATUS_PARAMS
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import (
@@ -50,6 +51,7 @@ class AduroCoordinator(DataUpdateCoordinator):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize the coordinator."""
         self.entry = entry
+        self._store = Store(hass, version=1, key=f"{DOMAIN}_{entry.entry_id}_pellet_data")
         self.hass = hass
         
         # Configuration from config entry
@@ -1299,6 +1301,44 @@ class AduroCoordinator(DataUpdateCoordinator):
             asyncio.create_task(self.async_stop_stove())
         
         _LOGGER.info("Auto-resume after wood mode %s", "enabled" if enabled else "disabled")
+
+    async def async_load_pellet_data(self) -> None:
+        """Load pellet tracking data from storage."""
+        data = await self._store.async_load()
+        if data:
+            self._pellets_consumed = data.get("pellets_consumed", 0.0)
+            self._refill_counter = data.get("refill_counter", 0)
+            self._consumption_at_refill = data.get("consumption_at_refill", 0.0)
+            self._days_since_refill = data.get("days_since_refill", 0)
+            self._consumption_snapshots = data.get("consumption_snapshots", {})
+            self._snapshots_initialized = data.get("snapshots_initialized", False)
+            
+            # Convert last_consumption_day string back to date object
+            last_day_str = data.get("last_consumption_day")
+            if last_day_str:
+                from datetime import datetime
+                self._last_consumption_day = datetime.fromisoformat(last_day_str).date()
+            
+            _LOGGER.info(
+                "Loaded pellet data from storage - consumed: %.2f kg, refills: %d, days: %d",
+                self._pellets_consumed,
+                self._refill_counter,
+                self._days_since_refill
+        )
+
+    async def async_save_pellet_data(self) -> None:
+        """Save pellet tracking data to storage."""
+        data = {
+            "pellets_consumed": self._pellets_consumed,
+            "refill_counter": self._refill_counter,
+            "consumption_at_refill": self._consumption_at_refill,
+            "days_since_refill": self._days_since_refill,
+            "consumption_snapshots": self._consumption_snapshots,
+            "last_consumption_day": self._last_consumption_day.isoformat() if self._last_consumption_day else None,
+            "snapshots_initialized": getattr(self, '_snapshots_initialized', False),
+        }
+        await self._store.async_save(data)
+        _LOGGER.debug("Saved pellet data to storage")
     
     # -------------------------------------------------------------------------
     # Temperature alert methods
