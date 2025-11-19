@@ -1,0 +1,332 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Aduro Hybrid Ofen einrichten",
+        "description": "Geben Sie Ihre Ofenverbindungsdetails ein",
+        "data": {
+          "stove_serial": "Seriennummer des Ofens",
+          "stove_pin": "Ofen-PIN",
+          "stove_model": "Ofenmodell"
+        }
+      }
+    },
+    "error": {
+      "missing_serial": "Seriennummer ist erforderlich",
+      "missing_pin": "PIN ist erforderlich",
+      "cannot_connect": "Verbindung fehlgeschlagen",
+      "unknown": "Unerwarteter Fehler"
+    },
+    "abort": {
+      "already_configured": "Dieser Ofen ist bereits konfiguriert"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Aduro Ofen konfigurieren",
+        "description": "Wählen Sie einen Konfigurationsbereich",
+        "menu_options": {
+          "pellet_settings": "Pellet-Einstellungen",
+          "temperature_alerts": "Temperaturwarnungen",
+          "advanced_settings": "Erweiterte Einstellungen"
+        }
+      },
+      "pellet_settings": {
+        "title": "Pellet-Konfiguration",
+        "description": "Konfigurieren Sie den Pelletbehälter und Warnungen bei niedrigem Pelletstand",
+        "data": {
+          "pellet_capacity": "Kapazität des Pelletbehälters (kg)",
+          "notification_level": "Benachrichtigungsstufe für niedrigen Pelletstand (%)",
+          "shutdown_level": "Abschaltstufe bei niedrigem Pelletstand (%)",
+          "auto_shutdown_enabled": "Automatische Abschaltung aktivieren"
+        },
+        "data_description": {
+          "pellet_capacity": "Gesamtkapazität Ihres Pelletbehälters in Kilogramm",
+          "notification_level": "Erhalten Sie eine Benachrichtigung, wenn der Pelletstand unter diesen Prozentsatz fällt",
+          "shutdown_level": "Ofen automatisch abschalten, wenn der Pelletstand unter diesen Prozentsatz fällt",
+          "auto_shutdown_enabled": "Dem Ofen erlauben, bei niedrigem Pelletstand automatisch abzuschalten"
+        }
+      },
+      "temperature_alerts": {
+        "title": "Konfiguration der Temperaturwarnung",
+        "description": "Konfigurieren Sie die Temperaturüberwachung und Warnungen",
+        "data": {
+          "high_smoke_temp_threshold": "Hohe Rauchtemperatur-Schwelle (°C)",
+          "high_smoke_duration_threshold": "Dauer für hohe Rauchwarnung (Sekunden)",
+          "low_wood_temp_threshold": "Niedrige Holzmodus-Temperatur-Schwelle (°C)",
+          "low_wood_duration_threshold": "Dauer für niedrige Holzmodus-Warnung (Sekunden)"
+        },
+        "data_description": {
+          "high_smoke_temp_threshold": "Warnung auslösen, wenn die Rauchtemperatur diesen Wert überschreitet",
+          "high_smoke_duration_threshold": "Zeit in Sekunden, die die Temperatur den Schwellenwert überschreiten muss, bevor eine Warnung ausgegeben wird",
+          "low_wood_temp_threshold": "Warnung auslösen, wenn die Temperatur im Holzmodus unter diesen Wert fällt",
+          "low_wood_duration_threshold": "Zeit in Sekunden, die die Temperatur niedrig sein muss, bevor eine Warnung ausgegeben wird"
+        }
+      },
+      "advanced_settings": {
+        "title": "Erweiterte Einstellungen",
+        "description": "Konfigurieren Sie erweiterte Verhaltensweisen des Ofens",
+        "data": {
+          "auto_resume_after_wood": "Automatische Wiederaufnahme nach Holzmodus"
+        },
+        "data_description": {
+          "auto_resume_after_wood": "Automatische Wiederaufnahme des Pelletbetriebs mit den vorherigen Einstellungen beim Verlassen des Holzmodus"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "state": {
+        "name": "Zustand",
+        "state": {
+          "state_operating": "Leistung {heatlevel}",
+          "state_stopped": "Gestoppt",
+          "state_off": "Aus",
+          "state_operating_iii": "Leistung III",
+          "state_stopped_draft": "Fallschacht heiß",
+          "state_stopped_smoke_sensor": "Schlechter Rauchsensor",
+          "state_stopped_dropshaft": "Schlechter Fallschachtsensor",
+          "state_stopped_burner_yellow": "Brenner gelb prüfen",
+          "state_stopped_auger": "schlechter externer Schneckenausgang",
+          "state_stopped_timer": "Vom Timer gestoppt",
+          "state_operating_air_damper": "Luftklappe geschlossen",
+          "state_stopped_co_sensor": "Co-Sensor defekt",
+          "state_stopped_no_fan": "Kein Stromverbrauch für Lüfter"
+        }
+      },
+      "substate": {
+        "name": "Unterzustand",
+        "state": {
+          "substate_waiting": "Warten",
+          "substate_ignition_1": "Zündung 1",
+          "substate_ignition_2": "Zündung 2",
+          "substate_normal": "Normal",
+          "substate_temp_reached": "Raumtemperatur erreicht",
+          "substate_wood_burning": "Holzverbrennung",
+          "substate_failed_ignition": "Fehlgeschlagene Zündung - Tür öffnen und Brenner auf Pelletansammlung prüfen",
+          "substate_by_button": "Per Taste",
+          "substate_wood_burning_question": "Holzverbrennung?",
+          "substate_no_fuel": "Kein Brennstoff",
+          "substate_unknown": "Unbekannt",
+          "substate_heating_up": "Aufheizen",
+          "substate_check_burn_cup": "Brennertopf prüfen"
+        }
+      },
+      "status_main": {
+        "name": "Status"
+      },
+      "status_sub": {
+        "name": "Statusdetail"
+      },
+      "boiler_temp": {
+        "name": "Raumtemperatur"
+      },
+      "boiler_ref": {
+        "name": "Solltemperatur"
+      },
+      "smoke_temp": {
+        "name": "Rauchtemperatur"
+      },
+      "shaft_temp": {
+        "name": "Schachttemperatur"
+      },
+      "power_kw": {
+        "name": "Leistungsabgabe"
+      },
+      "power_pct": {
+        "name": "Leistung in Prozent"
+      },
+      "heatlevel": {
+        "name": "Heizstufe"
+      },
+      "heatlevel_display": {
+        "name": "Anzeige Heizstufe"
+      },
+      "operation_mode": {
+        "name": "Betriebsart"
+      },
+      "pellet_amount": {
+        "name": "Verbleibende Pellets"
+      },
+      "pellet_percentage": {
+        "name": "Pellets in Prozent"
+      },
+      "pellet_consumed": {
+        "name": "Verbrauchte Pellets"
+      },
+      "consumption_total": {
+        "name": "Gesamtverbrauch"
+      },
+      "refill_counter": {
+        "name": "Nachfüllzähler"
+      },
+      "consumption_day": {
+        "name": "Heutiger Verbrauch"
+      },
+      "consumption_yesterday": {
+        "name": "Gestriger Verbrauch"
+      },
+      "consumption_month": {
+        "name": "Verbrauch diesen Monat"
+      },
+      "consumption_year": {
+        "name": "Verbrauch dieses Jahr"
+      },
+      "stove_ip": {
+        "name": "Ofen-IP-Adresse"
+      },
+      "router_ssid": {
+        "name": "WLAN-Netzwerk"
+      },
+      "stove_rssi": {
+        "name": "WLAN-Signalstärke"
+      },
+      "stove_mac": {
+        "name": "MAC-Adresse"
+      },
+      "timer_startup_1": {
+        "name": "Zündtimer 1"
+      },
+      "timer_startup_2": {
+        "name": "Zündtimer 2"
+      },
+      "operating_time_stove": {
+        "name": "Gesamtbetriebszeit"
+      },
+      "operating_time_auger": {
+        "name": "Betriebszeit der Schnecke"
+      },
+      "operating_time_ignition": {
+        "name": "Betriebszeit der Zündung"
+      },
+      "mode_transition": {
+        "name": "Modusübergang"
+      },
+      "change_in_progress": {
+        "name": "Änderung wird durchgeführt"
+      },
+      "display_format": {
+        "name": "Anzeigeformat"
+      },
+      "display_target": {
+        "name": "Anzeigeziel"
+      },
+      "app_change_detected": {
+        "name": "Externe Änderung erkannt"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Strom"
+      },
+      "auto_shutdown": {
+        "name": "Automatische Abschaltung bei niedrigem Pelletstand"
+      },
+      "auto_resume_wood": {
+        "name": "Automatische Wiederaufnahme nach Holzmodus"
+      }
+    },
+    "number": {
+      "heatlevel": {
+        "name": "Heizstufe"
+      },
+      "temperature": {
+        "name": "Solltemperatur"
+      },
+      "pellet_capacity": {
+        "name": "Pelletkapazität"
+      },
+      "notification_level": {
+        "name": "Benachrichtigungsstufe für niedrigen Pelletstand"
+      },
+      "shutdown_level": {
+        "name": "Abschaltpelletstand"
+      }
+    },
+    "button": {
+      "refill_pellets": {
+        "name": "Pellets nachfüllen"
+      },
+      "clean_stove": {
+        "name": "Ofen reinigen"
+      },
+      "toggle_mode": {
+        "name": "Modus umschalten"
+      },
+      "resume_after_wood": {
+        "name": "Nach Holzmodus fortsetzen"
+      },
+      "force_auger": {
+        "name": "Schnecke erzwingen"
+      }
+    }
+  },
+  "services": {
+    "start_stove": {
+      "name": "Ofen starten",
+      "description": "Startet den Pellet-Ofenbetrieb."
+    },
+    "stop_stove": {
+      "name": "Ofen anhalten",
+      "description": "Stoppt den Pellet-Ofenbetrieb."
+    },
+    "set_heatlevel": {
+      "name": "Heizstufe einstellen",
+      "description": "Stellt die Heizstufe des Ofens ein (1-3). Wechselt auch in den Betriebsmodus Heizstufe.",
+      "fields": {
+        "heatlevel": {
+          "name": "Heizstufe",
+          "description": "Einzustellende Heizstufe (1=Niedrig, 2=Mittel, 3=Hoch)."
+        }
+      }
+    },
+    "set_temperature": {
+      "name": "Temperatur einstellen",
+      "description": "Stellt die Ziel-Raumtemperatur ein. Wechselt auch in den Betriebsmodus Temperatur.",
+      "fields": {
+        "temperature": {
+          "name": "Temperatur",
+          "description": "Zieltemperatur in Grad Celsius."
+        }
+      }
+    },
+    "set_operation_mode": {
+      "name": "Betriebsart einstellen",
+      "description": "Stellt die Betriebsart des Ofens ein.",
+      "fields": {
+        "mode": {
+          "name": "Betriebsart",
+          "description": "Betriebsart: 0=Heizstufe, 1=Temperatur, 2=Holz"
+        }
+      }
+    },
+    "toggle_mode": {
+      "name": "Modus umschalten",
+      "description": "Wechselt zwischen den Betriebsmodi Heizstufe und Temperatur."
+    },
+    "resume_after_wood_mode": {
+      "name": "Nach Holzmodus fortsetzen",
+      "description": "Setzt den Pelletbetrieb nach dem Holzmodus fort und stellt die vorherigen Einstellungen wieder her."
+    },
+    "force_auger": {
+      "name": "Schnecke erzwingen",
+      "description": "Zwingt die Pelletschnecke zum Laufen (zum Testen oder Beseitigen von Verstopfungen)."
+    },
+    "set_custom": {
+      "name": "Benutzerdefinierten Parameter einstellen",
+      "description": "Stellt einen benutzerdefinierten Ofenparameter nach Pfad und Wert ein (erweitert).",
+      "fields": {
+        "path": {
+          "name": "Parameterpfad",
+          "description": "Der Parameterpfad (z. B. 'auger.forced_run')."
+        },
+        "value": {
+          "name": "Wert",
+          "description": "Der einzustellende Wert (kann eine Zeichenfolge, eine Zahl oder ein boolescher Wert sein)."
+        }
+      }
+    }
+  }
+}
