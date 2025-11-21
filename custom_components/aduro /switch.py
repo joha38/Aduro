@@ -41,14 +41,14 @@ class AduroSwitchBase(CoordinatorEntity, SwitchEntity):
         coordinator: AduroCoordinator,
         entry: ConfigEntry,
         switch_type: str,
-        name: str,
+        translation_key: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entry = entry
         self._attr_has_entity_name = True
         self._attr_unique_id = f"{entry.entry_id}_{switch_type}"
-        self._attr_name = name
+        self._attr_translation_key = translation_key
         self._switch_type = switch_type
 
     def combined_firmware_version(self) -> str | None:
@@ -117,7 +117,7 @@ class AduroStartStopSwitch(AduroSwitchBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the switch."""
-        super().__init__(coordinator, entry, "power", "Power")
+        super().__init__(coordinator, entry, "power", "power")
         self._attr_icon = "mdi:power"
 
     @property
@@ -196,7 +196,7 @@ class AduroAutoShutdownSwitch(AduroSwitchBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the switch."""
-        super().__init__(coordinator, entry, "auto_shutdown", "Auto Shutdown at Low Pellets")
+        super().__init__(coordinator, entry, "auto_shutdown", "auto_shutdown")
         self._attr_icon = "mdi:power-settings"
 
     @property
@@ -246,7 +246,7 @@ class AduroAutoResumeAfterWoodSwitch(AduroSwitchBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the switch."""
-        super().__init__(coordinator, entry, "auto_resume_wood", "Auto Resume After Wood Mode")
+        super().__init__(coordinator, entry, "auto_resume_wood", "auto_resume_wood")
         self._attr_icon = "mdi:restart"
 
     @property
