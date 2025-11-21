@@ -95,8 +95,6 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._consumption_snapshots = {}  # Stores monthly snapshots by year-month
 
         # Daily consumption tracking
-        self._consumption_at_refill = 0.0  # Last seen daily consumption value (baseline)
-        self._days_since_refill = 0
         self._last_consumption_day: date | None = None
         
         # Wood mode tracking
@@ -636,61 +634,60 @@ class AduroCoordinator(DataUpdateCoordinator):
         data["timers"] = timers
 
     def _calculate_pellet_levels(self, data: dict[str, Any]) -> None:
-        """Calculate pellet levels based on daily consumption increments."""
-        from datetime import date
+        """Calculate pellet levels based on consumption_day increments."""
         
         # Get today's consumption from sensor
-        if "consumption" in data:
-            today_consumption = data["consumption"].get("day", 0)
-            current_day = date.today()
+        if "consumption" not in data:
+            _LOGGER.debug("No consumption data available")
+            return
+        
+        current_day_consumption = data["consumption"].get("day", 0)
+        
+        # Initialize on first run
+        if not hasattr(self, '_last_consumption_day_value'):
+            self._last_consumption_day_value = current_day_consumption
+            _LOGGER.info(
+                "Initialized consumption tracking: baseline=%.2f kg",
+                current_day_consumption
+            )
+        
+        # Calculate the change in consumption_day
+        consumption_change = current_day_consumption - self._last_consumption_day_value
+        
+        # Handle midnight reset (consumption_day decreased)
+        if consumption_change < 0:
+            _LOGGER.info(
+                "Midnight reset detected - consumption_day went from %.2f to %.2f kg",
+                self._last_consumption_day_value,
+                current_day_consumption
+            )
+            # Update baseline to new (reset) value, don't change pellets_consumed
+            self._last_consumption_day_value = current_day_consumption
             
-            # Initialize on first run
-            if self._last_consumption_day is None:
-                self._last_consumption_day = current_day
-                self._consumption_at_refill = today_consumption
-                _LOGGER.debug(
-                    "Initialized consumption tracking: baseline=%.2f kg, date=%s",
-                    today_consumption,
-                    current_day
-                )
+        # Handle normal consumption increase
+        elif consumption_change > 0:
+            # Add the increment to total consumed
+            self._pellets_consumed += consumption_change
+            self._last_consumption_day_value = current_day_consumption
             
-            # Detect midnight reset (day changed and consumption decreased)
-            if current_day != self._last_consumption_day:
-                _LOGGER.info(
-                    "Day changed from %s to %s - consumption reset detected",
-                    self._last_consumption_day,
-                    current_day
-                )
-                
-                # The daily sensor has reset to 0, start fresh
-                self._last_consumption_day = current_day
-                self._consumption_at_refill = 0.0
-                self._days_since_refill += 1
-                
-                _LOGGER.debug(
-                    "New day started - pellets consumed so far: %.2f kg, days since refill: %d",
-                    self._pellets_consumed,
-                    self._days_since_refill
-                )
-            
-            # Calculate increment since last baseline (or since midnight)
-            increment = max(0, today_consumption - self._consumption_at_refill)
-            
-            # Add increment to total consumed
-            if increment > 0:
-                self._pellets_consumed += increment
-                self._consumption_at_refill = today_consumption
-                
-                _LOGGER.debug(
-                    "Consumption increment: +%.2f kg (total: %.2f kg, today: %.2f kg)",
-                    increment,
-                    self._pellets_consumed,
-                    today_consumption
-                )
+            _LOGGER.debug(
+                "Consumption increment: +%.2f kg (total consumed: %.2f kg, today: %.2f kg)",
+                consumption_change,
+                self._pellets_consumed,
+                current_day_consumption
+            )
+        
+        # No change - do nothing
+        else:
+            pass
         
         # Calculate remaining pellets
         amount_remaining = max(0, self._pellet_capacity - self._pellets_consumed)
-        percentage_remaining = (amount_remaining / self._pellet_capacity * 100) if self._pellet_capacity > 0 else 0
+        percentage_remaining = (
+            (amount_remaining / self._pellet_capacity * 100) 
+            if self._pellet_capacity > 0 
+            else 0
+        )
         
         pellets = {
             "capacity": self._pellet_capacity,
@@ -701,7 +698,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             "notification_level": self._notification_level,
             "shutdown_level": self._shutdown_level,
             "auto_shutdown_enabled": self._auto_shutdown_enabled,
-            "days_since_refill": self._days_since_refill,
+            "last_day_value": self._last_consumption_day_value,  # For debugging
         }
         
         data["pellets"] = pellets
@@ -1245,8 +1242,6 @@ class AduroCoordinator(DataUpdateCoordinator):
             if data:
                 self._pellets_consumed = data.get("pellets_consumed", 0.0)
                 self._refill_counter = data.get("refill_counter", 0)
-                self._consumption_at_refill = data.get("consumption_at_refill", 0.0)
-                self._days_since_refill = data.get("days_since_refill", 0)
                 self._consumption_snapshots = data.get("consumption_snapshots", {})
                 self._snapshots_initialized = data.get("snapshots_initialized", False)
                 
@@ -1259,8 +1254,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 _LOGGER.info(
                     "Loaded pellet data from storage - consumed: %.2f kg, refills: %d, days: %d",
                     self._pellets_consumed,
-                    self._refill_counter,
-                    self._days_since_refill
+                    self._refill_counter
                 )
             else:
                 _LOGGER.debug("No stored pellet data found, starting fresh")
@@ -1273,8 +1267,6 @@ class AduroCoordinator(DataUpdateCoordinator):
             data = {
                 "pellets_consumed": self._pellets_consumed,
                 "refill_counter": self._refill_counter,
-                "consumption_at_refill": self._consumption_at_refill,
-                "days_since_refill": self._days_since_refill,
                 "consumption_snapshots": self._consumption_snapshots,
                 "snapshots_initialized": getattr(self, '_snapshots_initialized', False),
                 "last_consumption_day": self._last_consumption_day.isoformat() if self._last_consumption_day else None,
@@ -1305,7 +1297,6 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Reset all tracking
         self._pellets_consumed = 0.0
-        self._days_since_refill = 0
         self._last_consumption_day = date.today()
         self._refill_counter += 1
         self._low_pellet_notification_sent = False
@@ -1689,7 +1680,6 @@ class AduroCoordinator(DataUpdateCoordinator):
         smoke_temp = data["operating"].get("smoke_temp", 0)
         current_state = data["operating"].get("state")
         is_in_wood_mode = current_state in ["9"]
-        shaft_temp = data["operating"].get("shaft_temp", 0)
         
         # Initialize alerts dict if not present
         if "alerts" not in data:
@@ -1745,12 +1735,12 @@ class AduroCoordinator(DataUpdateCoordinator):
         # =========================================================================
         
         if is_in_wood_mode:
-            if shaft_temp <= self._low_wood_temp_threshold:
+            if smoke_temp <= self._low_wood_temp_threshold:
                 if self._low_wood_temp_start_time is None:
                     self._low_wood_temp_start_time = datetime.now()
                     _LOGGER.info(
                         "Low wood mode temperature detected: %.1f°C (threshold: %.1f°C)",
-                        shaft_temp,
+                        smoke_temp,
                         self._low_wood_temp_threshold
                     )
                 
@@ -1761,7 +1751,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         if not self._low_wood_alert_sent:
                             _LOGGER.warning(
                                 "LOW WOOD MODE TEMPERATURE ALERT: %.1f°C for %d seconds (threshold: %.1f°C for %d seconds)",
-                                shaft_temp,
+                                smoke_temp,
                                 int(elapsed),
                                 self._low_wood_temp_threshold,
                                 self._low_wood_duration_threshold
@@ -1777,13 +1767,13 @@ class AduroCoordinator(DataUpdateCoordinator):
             else:
                 # Temperature rose above threshold
                 if self._low_wood_temp_start_time is not None:
-                    _LOGGER.debug("Wood mode temperature returned to normal: %.1f°C", shaft_temp)
+                    _LOGGER.debug("Wood mode temperature returned to normal: %.1f°C", smoke_temp)
                 self._low_wood_temp_start_time = None
                 self._low_wood_alert_active = False
                 # Reset alert flag only when temp rises significantly above threshold (hysteresis)
-                if shaft_temp > (self._low_wood_temp_threshold + 10):
+                if smoke_temp > (self._low_wood_temp_threshold + 10):
                     if self._low_wood_alert_sent:
-                        _LOGGER.info("Low wood temperature alert cleared (temp: %.1f°C)", shaft_temp)
+                        _LOGGER.info("Low wood temperature alert cleared (temp: %.1f°C)", smoke_temp)
                     self._low_wood_alert_sent = False
         else:
             # Not in wood mode - reset tracking
@@ -1848,7 +1838,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         data["alerts"]["low_wood_temp_alert"] = {
             "active": self._low_wood_alert_active,
-            "current_temp": shaft_temp,
+            "current_temp": smoke_temp,
             "threshold_temp": self._low_wood_temp_threshold,
             "threshold_duration": self._low_wood_duration_threshold,
             "in_wood_mode": is_in_wood_mode,
