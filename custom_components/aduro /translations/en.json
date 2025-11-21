@@ -243,6 +243,18 @@
       },
       "shutdown_level": {
         "name": "Auto-Shutdown Pellet Level"
+      },
+      "high_smoke_temp_threshold": {
+        "name": "High smoke temp threshold"
+      },
+      "high_smoke_duration_threshold": {
+        "name": "High smoke duration threshold"
+      },
+      "low_wood_temp_threshold": {
+        "name": "Low wood temp threshold"
+      },
+      "low_wood_duration_threshold": {
+        "name": "Low wood duration threshold"
       }
     },
     "button": {
