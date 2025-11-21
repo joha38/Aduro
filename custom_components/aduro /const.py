@@ -249,11 +249,11 @@ ICON_ALERT: Final = "mdi:alert"
 ICON_ALERT_CIRCLE: Final = "mdi:alert-circle-outline"
 
 # Update intervals
-UPDATE_INTERVAL_NORMAL: Final = timedelta(seconds=20)
+UPDATE_INTERVAL_NORMAL: Final = timedelta(seconds=45)
 UPDATE_INTERVAL_FAST: Final = timedelta(seconds=5)
-UPDATE_COUNT_AFTER_COMMAND: Final = 8  # Number of fast updates after command (40 seconds total)
+UPDATE_COUNT_AFTER_COMMAND: Final = 5  # Number of fast updates after command (25 seconds total)
 
 # Timeouts for state transitions
-TIMEOUT_MODE_TRANSITION: Final = 60  # seconds - reduced from 120
-TIMEOUT_CHANGE_IN_PROGRESS: Final = 120  # seconds - reduced from 300
+TIMEOUT_MODE_TRANSITION: Final = 100  # seconds - reduced from 120
+TIMEOUT_CHANGE_IN_PROGRESS: Final = 100  # seconds - reduced from 300
 TIMEOUT_COMMAND_RESPONSE: Final = 30  # seconds - wait for command acknowledgment
