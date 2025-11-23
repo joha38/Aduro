@@ -9,7 +9,7 @@ _LOGGER = logging.getLogger(__name__)
 # Try to import standard pyduro first, fall back to custom implementation
 try:
     from pyduro.actions import discover, get, set, raw, STATUS_PARAMS
-    _LOGGER.info("Using standard pyduro library")
+    _LOGGER.info("Using standard pyduro library")<
     USING_CUSTOM_PYDURO = False
 except ImportError:
     _LOGGER.warning("Standard pyduro not found, using custom implementation")
