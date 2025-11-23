@@ -174,6 +174,15 @@
       "consumption_year": {
         "name": "Verbrauch dieses Jahr"
       },
+      "year_over_year": {
+        "name": "Jahr für Jahr"
+      },
+      "monthly_history": {
+        "name": "Monatlicher Verbrauchsverlauf"
+      },
+      "yearly_history": {
+        "name": "Jährliche Verbrauchshistorie"
+      },
       "stove_ip": {
         "name": "Ofen-IP-Adresse"
       },
@@ -255,6 +264,12 @@
       },
       "low_wood_duration_threshold": {
         "name": "Dauer für niedrige Holzmodus-Warnung (Sekunden)"
+      },
+      "high_smoke_temp_alert": {
+        "name": "Warnung vor hoher Rauchentwicklung"
+      },
+      "low_wood_temp_alert": {
+        "name": "Warnung bei niedriger Holztemperatur"
       }
     },
     "button": {
