@@ -9,6 +9,7 @@ PLATFORMS: Final = ["sensor", "switch", "number", "button"]
 CONF_STOVE_SERIAL: Final = "stove_serial"
 CONF_STOVE_PIN: Final = "stove_pin"
 CONF_STOVE_MODEL: Final = "stove_model"
+CONF_STOVE_IP: Final = "stove_ip"
 
 # Stove models
 STOVE_MODEL_H1: Final = "H1"
