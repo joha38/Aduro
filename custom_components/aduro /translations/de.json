@@ -2,18 +2,23 @@
   "config": {
     "step": {
       "user": {
-        "title": "Aduro Hybrid Ofen einrichten",
-        "description": "Geben Sie Ihre Ofenverbindungsdetails ein",
+        "title": "Aduro Hybrid-Ofen einrichten",
+        "description": "Geben Sie die Verbindungsdaten Ihres Ofens ein",
         "data": {
           "stove_serial": "Seriennummer des Ofens",
           "stove_pin": "Ofen-PIN",
-          "stove_model": "Ofenmodell"
+          "stove_model": "Ofenmodell",
+          "stove_ip": "Feste IP-Adresse (optional)"
+        },
+        "data_description": {
+          "stove_ip": "Leer lassen für automatische Erkennung oder eine feste IP-Adresse eingeben"
         }
       }
     },
     "error": {
       "missing_serial": "Seriennummer ist erforderlich",
       "missing_pin": "PIN ist erforderlich",
+      "invalid_ip": "Ungültiges IP-Adressformat",
       "cannot_connect": "Verbindung fehlgeschlagen",
       "unknown": "Unerwarteter Fehler"
     },
@@ -24,11 +29,18 @@
   "options": {
     "step": {
       "init": {
-        "title": "Aduro Ofen konfigurieren",
-        "description": "Wählen Sie einen Konfigurationsbereich",
+        "title": "Aduro-Ofen konfigurieren",
+        "description": "Ofeneinstellungen aktualisieren",
+        "data": {
+          "stove_model": "Ofenmodell",
+          "stove_ip": "Feste IP-Adresse (optional)"
+        },
+        "data_description": {
+          "stove_ip": "Leer lassen für automatische Erkennung oder eine feste IP-Adresse eingeben"
+        },
         "menu_options": {
-          "pellet_settings": "Pellet-Einstellungen",
-          "temperature_alerts": "Temperaturwarnungen",
+          "pellet_settings": "Pelleteinstellungen",
+          "temperature_alerts": "Temperaturalarm",
           "advanced_settings": "Erweiterte Einstellungen"
         }
       },
