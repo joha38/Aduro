@@ -25,6 +25,7 @@ from .const import (
     CONF_STOVE_SERIAL,
     CONF_STOVE_PIN,
     CONF_STOVE_MODEL,
+    CONF_STOVE_IP,
     DEFAULT_SCAN_INTERVAL,
     UPDATE_INTERVAL_FAST,
     UPDATE_INTERVAL_NORMAL,
@@ -56,6 +57,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Configuration from config entry
         self.serial = entry.data[CONF_STOVE_SERIAL]
         self.pin = entry.data[CONF_STOVE_PIN]
+        self.fixed_ip = entry.data.get(CONF_STOVE_IP)
         self.stove_model = entry.data.get(CONF_STOVE_MODEL, "H2")
         
         # Stove connection details
@@ -237,13 +239,16 @@ class AduroCoordinator(DataUpdateCoordinator):
 
     def _should_rediscover(self) -> bool:
         """Determine if we should rediscover the stove."""
+        # Don't rediscover if using fixed IP
+        if self.fixed_ip:
+            return False
+        
         if self.last_discovery is None:
             return True
         # Rediscover every hour
         try:
             return (datetime.now() - self.last_discovery) > timedelta(hours=1)
         except TypeError:
-            # If last_discovery is somehow invalid, rediscover
             _LOGGER.debug("Invalid last_discovery timestamp, forcing rediscovery")
             return True
 
@@ -817,6 +822,41 @@ class AduroCoordinator(DataUpdateCoordinator):
 
     async def _async_discover_stove(self) -> None:
         """Discover the stove on the network."""
+        # If fixed IP is configured, use it instead of discovery
+        if self.fixed_ip:
+            _LOGGER.info("Using fixed IP address: %s", self.fixed_ip)
+            self.stove_ip = self.fixed_ip
+            self.last_discovery = datetime.now()
+            
+            # Try to get firmware info if possible
+            try:
+                response = await self.hass.async_add_executor_job(discover.run)
+                data = response.parse_payload()
+                
+                old_version = self.firmware_version
+                old_build = self.firmware_build
+                
+                self.firmware_version = data.get("Ver")
+                self.firmware_build = data.get("Build")
+                
+                version_changed = (old_version != self.firmware_version or 
+                                old_build != self.firmware_build)
+                
+                if version_changed and old_version is not None:
+                    _LOGGER.info(
+                        "Firmware version changed from %s.%s to %s.%s",
+                        old_version or "?",
+                        old_build or "?",
+                        self.firmware_version or "?",
+                        self.firmware_build or "?"
+                    )
+                    await self._update_device_registry()
+            except Exception as err:
+                _LOGGER.debug("Could not get firmware info via discovery: %s", err)
+            
+            return
+        
+        # Discovery logic for when no fixed IP is set
         try:
             response = await self.hass.async_add_executor_job(discover.run)
             data = response.parse_payload()
@@ -855,19 +895,15 @@ class AduroCoordinator(DataUpdateCoordinator):
             version_changed = (old_version != self.firmware_version or 
                             old_build != self.firmware_build)
             
-
-            # Update device registry (but only after initial setup is complete)
-            if self.firmware_version or self.firmware_build:
-                if version_changed and old_version is not None:
-                    _LOGGER.info(
-                        "Firmware version changed from %s.%s to %s.%s",
-                        old_version or "?",
-                        old_build or "?",
-                        self.firmware_version or "?",
-                        self.firmware_build or "?"
-                    )
-                    # Only call update if not first discovery (device exists)
-                    await self._update_device_registry()
+            if version_changed and old_version is not None:
+                _LOGGER.info(
+                    "Firmware version changed from %s.%s to %s.%s",
+                    old_version or "?",
+                    old_build or "?",
+                    self.firmware_version or "?",
+                    self.firmware_build or "?"
+                )
+                await self._update_device_registry()
 
         except Exception as err:
             _LOGGER.warning("Discovery failed, using cloud backup: %s", err)
@@ -918,7 +954,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self.serial,
                 self.pin,
                 11,  # function_id
-                "001*"  # payload
+                "001*"  # payloadasync def _async_discover_stove(self) -> None:
             )
             
             #data = response.parse_payload().split(',')
