@@ -329,38 +329,38 @@ class AduroSubStatusSensor(AduroSensorBase):
         super().__init__(coordinator, entry, "status_sub", "status_sub")
         self._attr_icon = "mdi:information-outline"
         self._timer_update_task = None
+        self._unsub_timer = None
 
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""
         await super().async_added_to_hass()
-        # Start the timer update loop
-        self._timer_update_task = self.hass.async_create_task(
-            self._async_timer_update_loop()
+        # Use event helpers instead of a background task
+        from homeassistant.helpers.event import async_track_time_interval
+        from datetime import timedelta
+        
+        # Update every second when timer is active
+        self._unsub_timer = async_track_time_interval(
+            self.hass,
+            self._timer_tick,
+            timedelta(seconds=1)
         )
 
     async def async_will_remove_from_hass(self) -> None:
         """When entity is being removed from hass."""
-        # Cancel the timer update task
-        if self._timer_update_task:
-            self._timer_update_task.cancel()
+        # Cancel the timer
+        if self._unsub_timer:
+            self._unsub_timer()
+            self._unsub_timer = None
         await super().async_will_remove_from_hass()
 
-    async def _async_timer_update_loop(self) -> None:
-        """Update the sensor every second when timer is active."""
-        import asyncio
-        
-        while True:
-            try:
-                await asyncio.sleep(1)
-                
-                # Check if we should update
-                if self._should_update_timer():
-                    self.async_write_ha_state()
-                    
-            except asyncio.CancelledError:
-                break
-            except Exception as err:
-                _LOGGER.error("Error in timer update loop: %s", err)
+    async def _timer_tick(self, now=None):
+        """Timer tick callback."""
+        try:
+            # Only update if timer is active
+            if self._should_update_timer():
+                self.async_write_ha_state()
+        except Exception as err:
+            _LOGGER.error("Error in timer tick: %s", err)
 
     def _should_update_timer(self) -> bool:
         """Check if timer is active and needs updating."""
