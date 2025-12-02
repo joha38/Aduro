@@ -2,7 +2,7 @@
 [![GitHub release](https://img.shields.io/github/release/NewImproved/Aduro.svg)](https://github.com/NewImproved/Aduro/releases)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=W6WPMAQ3YKK6G)
 
-# ALPHA-RELEASE UNDER CONSTRUCTION!!!
+# BETA-RELEASE UNDER CONSTRUCTION!!!
 All functions are not yet tested.
 
 # Aduro Hybrid Stove Integration for Home Assistant
