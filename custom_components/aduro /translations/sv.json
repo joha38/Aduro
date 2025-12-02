@@ -160,25 +160,25 @@
         "name": "Pellets Förbrukade"
       },
       "consumption_total": {
-        "name": "Total Förbrukning"
+        "name": "Förbrukning total"
       },
       "refill_counter": {
         "name": "Påfyllningsräknare"
       },
       "consumption_day": {
-        "name": "Dagens Förbrukning"
+        "name": "Förbrukning idag"
       },
       "consumption_yesterday": {
-        "name": "Gårdagens Förbrukning"
+        "name": "Förbrukning igår"
       },
       "consumption_month": {
-        "name": "Denna Månads Förbrukning"
+        "name": "Förbrukning månad"
       },
       "consumption_year": {
-        "name": "Årets Förbrukning"
+        "name": "Förbrukning år"
       },
       "year_over_year": {
-        "name": "År mot år"
+        "name": "Förbrukningshistorik År mot år"
       },
       "monthly_history": {
         "name": "Förbrukningshistorik månad"
