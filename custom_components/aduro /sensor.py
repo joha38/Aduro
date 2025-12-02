@@ -57,6 +57,11 @@ async def async_setup_entry(
         
         # Power sensors
         AduroPowerKwSensor(coordinator, entry),
+
+        # Carbon Monoxide sensors
+        AduroCarbonMonoxideSensor(coordinator, entry),
+        AduroCarbonMonoxideYellowSensor(coordinator, entry),
+        AduroCarbonMonoxideRedSensor(coordinator, entry),
         
         # Operation sensors
         AduroOperationModeSensor(coordinator, entry),
@@ -522,6 +527,66 @@ class AduroPowerKwSensor(AduroSensorBase):
         """Return the power in kW."""
         if self.coordinator.data and "operating" in self.coordinator.data:
             return self.coordinator.data["operating"].get("power_kw")
+        return None
+
+
+# =============================================================================
+# Carbon Monoxide Sensors
+# =============================================================================
+
+class AduroCarbonMonoxideSensor(AduroSensorBase):
+    """Sensor for carbon monoxide level."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "carbon_monoxide", "carbon_monoxide")
+        self._attr_native_unit_of_measurement = "ppm"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_icon = "mdi:molecule-co"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the carbon monoxide level in ppm (multiplied by 10)."""
+        if self.coordinator.data and "operating" in self.coordinator.data:
+            co_value = round(self.coordinator.data["operating"].get("carbon_monoxide"), 0)
+            if co_value is not None:
+                return int(round(co_value * 10, 0))
+        return None
+
+
+class AduroCarbonMonoxideYellowSensor(AduroSensorBase):
+    """Sensor for carbon monoxide yellow threshold."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "carbon_monoxide_yellow", "carbon_monoxide_yellow")
+        self._attr_native_unit_of_measurement = "ppm"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_icon = "mdi:molecule-co"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the carbon monoxide yellow threshold in ppm."""
+        if self.coordinator.data and "operating" in self.coordinator.data:
+            return int(round(self.coordinator.data["operating"].get("carbon_monoxide_yellow"), 0))
+        return None
+
+
+class AduroCarbonMonoxideRedSensor(AduroSensorBase):
+    """Sensor for carbon monoxide red threshold."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "carbon_monoxide_red", "carbon_monoxide_red")
+        self._attr_native_unit_of_measurement = "ppm"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_icon = "mdi:molecule-co"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the carbon monoxide red threshold in ppm."""
+        if self.coordinator.data and "operating" in self.coordinator.data:
+            return int(round(self.coordinator.data["operating"].get("carbon_monoxide_red"), 0))
         return None
 
 
@@ -1369,3 +1434,4 @@ class AduroLowWoodTempAlertSensor(AduroSensorBase):
                 attrs["exceeded_by_minutes"] = round(time_info["exceeded_by"] / 60, 1)
         
         return attrs
+
