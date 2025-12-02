@@ -236,6 +236,15 @@
       },
       "app_change_detected": {
         "name": "Externe Änderung erkannt"
+      },
+      "carbon_monoxide": {
+        "name": "Kohlenmonoxidniveau"
+      },
+      "carbon_monoxide_yellow": {
+        "name": "Kohlenmonoxidniveau Gelb"
+      },
+      "carbon_monoxide_red": {
+        "name": "Kohlenmonoxidniveau Rot"
       }
     },
     "switch": {
