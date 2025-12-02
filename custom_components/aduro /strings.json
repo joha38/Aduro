@@ -169,28 +169,31 @@
         "name": "Pellets Consumed"
       },
       "consumption_total": {
-        "name": "Total Consumption"
+        "name": "Consumption Total"
       },
       "refill_counter": {
         "name": "Refill Counter"
       },
       "consumption_day": {
-        "name": "Today's Consumption"
+        "name": "Consumption Today"
       },
       "consumption_yesterday": {
-        "name": "Yesterday's Consumption"
+        "name": "Consumption Yesterday"
       },
       "consumption_month": {
-        "name": "This Month's Consumption"
+        "name": "Consumption This Month"
       },
       "consumption_year": {
-        "name": "This Year's Consumption"
+        "name": "Consumption This Year"
+      },
+      "year_over_year": {
+        "name": "Consumption history year over year"
       },
       "monthly_history": {
-        "name": "Monthly consumption history"
+        "name": "Consumption history Month"
       },
       "yearly_history": {
-        "name": "Yearly consumption history"
+        "name": "consumption history Year"
       },
       "stove_ip": {
         "name": "Stove IP Address"
@@ -239,6 +242,15 @@
       },
       "low_wood_temp_alert": {
         "name": "Low wood temp alert"
+      },
+      "carbon_monoxide": {
+      "name": "Kolmonoxidnivå"
+      },
+      "carbon_monoxide_yellow": {
+        "name": "Kolmonoxidnivå gul"
+      },
+      "carbon_monoxide_red": {
+        "name": "Kolmonoxidnivå röd"
       }
     },
     "switch": {
