@@ -150,7 +150,7 @@ SUBSTATE_NAMES: Final = {
     "14_0": "substate_by_button",
     "14_1": "substate_wood_burning_question",
     "20": "substate_no_fuel",
-    "28": "substate_unknown",
+    "28": "substate_door_open",
     "32": "substate_heating_up",
     "34": "substate_check_burn_cup",
 }
@@ -191,7 +191,7 @@ SUBSTATE_NAMES_DISPLAY: Final = {
     "14_0": "By button",
     "14_1": "Wood burning?",
     "20": "No fuel",
-    "28": "Unknown",
+    "28": "Door open",
     "32": "Heating up",
     "34": "Check burn cup",
 }
