@@ -90,7 +90,7 @@
   },
   "entity": {
     "sensor": {
-      "state": {
+      "state_disp": {
         "name": "State",
         "state": {
           "state_operating": "Power {heatlevel}",
@@ -121,7 +121,7 @@
           "substate_by_button": "By button",
           "substate_wood_burning_question": "Wood burning?",
           "substate_no_fuel": "No fuel",
-          "substate_unknown": "Unknown",
+          "substate_door_open": "Door open",
           "substate_heating_up": "Heating up",
           "substate_check_burn_cup": "Check burn cup"
         }
