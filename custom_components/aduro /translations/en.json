@@ -260,27 +260,27 @@
       "power": {
         "name": "Power"
       },
-      "auto_shutdown_at_low_pellets": {
+      "auto_shutdown": {
         "name": "Auto Shutdown at Low Pellets"
       },
-      "auto_resume_after_wood_mode": {
+      "auto_resume_wood": {
         "name": "Auto Resume After Wood Mode"
       }
     },
     "number": {
-      "heat_level": {
+      "heatlevel": {
         "name": "Heat Level"
       },
-      "target_temperature": {
+      "temperature": {
         "name": "Target Temperature"
       },
       "pellet_capacity": {
         "name": "Pellet Capacity"
       },
-      "low_pellet_notification_level": {
+      "notification_level": {
         "name": "Low Pellet Notification Level"
       },
-      "auto_shutdown_pellet_level": {
+      "shutdown_level": {
         "name": "Auto-Shutdown Pellet Level"
       },
       "high_smoke_temp_threshold": {
@@ -306,7 +306,7 @@
       "toggle_mode": {
         "name": "Toggle Mode"
       },
-      "resume_after_wood_mode": {
+      "resume_after_wood": {
         "name": "Resume After Wood Mode"
       },
       "force_auger": {
