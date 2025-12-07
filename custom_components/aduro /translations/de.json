@@ -262,7 +262,7 @@
       }
     },
     "number": {
-      "heatlevel": {
+      "heat_level": {
         "name": "Heizstufe"
       },
       "target_temperature": {
