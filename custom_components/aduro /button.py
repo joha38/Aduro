@@ -308,7 +308,7 @@ class AduroResumeAfterWoodButton(AduroButtonBase):
             return {}
         
         current_state = self.coordinator.data["operating"].get("state", "")
-        in_wood_mode = current_state in ["9", "14"]
+        in_wood_mode = current_state in ["9"]
         
         attrs = {
             "current_state": current_state,
@@ -340,7 +340,7 @@ class AduroResumeAfterWoodButton(AduroButtonBase):
         
         current_state = self.coordinator.data["operating"].get("state", "")
         
-        if current_state not in ["9", "14"]:
+        if current_state not in ["9"]:
             _LOGGER.warning(
                 "Button: Cannot resume - stove not in wood mode (current state: %s)",
                 current_state
