@@ -253,7 +253,7 @@
       "heatlevel": {
         "name": "Värmenivå"
       },
-      "temperature": {
+      "target_temperature": {
         "name": "Måltemperatur"
       },
       "pellet_capacity": {
