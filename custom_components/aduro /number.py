@@ -373,7 +373,7 @@ class AduroNotificationLevelNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "notification_level", "notification_level")
+        super().__init__(coordinator, entry, "low_pellet_notification_level", "low_pellet_notification_level")
         self._attr_icon = "mdi:bell-alert"
         self._attr_mode = NumberMode.BOX
         self._attr_native_min_value = NOTIFICATION_LEVEL_MIN
@@ -422,7 +422,7 @@ class AduroShutdownLevelNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "shutdown_level", "shutdown_level")
+        super().__init__(coordinator, entry, "auto_shutdown_pellet_level", "auto_shutdown_pellet_level")
         self._attr_icon = "mdi:power-off"
         self._attr_mode = NumberMode.BOX
         self._attr_native_min_value = SHUTDOWN_LEVEL_MIN
