@@ -255,12 +255,14 @@ class AduroAutoShutdownSwitch(AduroSwitchBase):
         """Enable auto-shutdown."""
         _LOGGER.info("Switch: Enabling auto-shutdown at low pellet level")
         self.coordinator.set_auto_shutdown_enabled(True)
+        await self.coordinator.async_save_pellet_data()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable auto-shutdown."""
         _LOGGER.info("Switch: Disabling auto-shutdown at low pellet level")
         self.coordinator.set_auto_shutdown_enabled(False)
+        await self.coordinator.async_save_pellet_data()
         await self.coordinator.async_request_refresh()
 
 
@@ -312,10 +314,12 @@ class AduroAutoResumeAfterWoodSwitch(AduroSwitchBase):
         """Enable auto-resume after wood mode."""
         _LOGGER.info("Switch: Enabling auto-resume after wood mode")
         self.coordinator.set_auto_resume_after_wood(True)
+        await self.coordinator.async_save_pellet_data()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable auto-resume after wood mode."""
         _LOGGER.info("Switch: Disabling auto-resume after wood mode")
         self.coordinator.set_auto_resume_after_wood(False)
+        await self.coordinator.async_save_pellet_data()
         await self.coordinator.async_request_refresh()
