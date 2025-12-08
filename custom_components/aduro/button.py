@@ -154,27 +154,29 @@ class AduroRefillPelletsButton(AduroButtonBase):
         pellets = self.coordinator.data["pellets"]
         
         return {
-            "consumed_before_refill": pellets.get("consumed", 0),
-            "refill_counter": pellets.get("refill_counter", 0),
+            "consumed_since_last_refill": round(pellets.get("consumed", 0), 1),
+            "total_consumed_since_cleaning": round(pellets.get("consumed_total", 0), 1),
             "capacity": pellets.get("capacity", 0),
         }
 
     async def async_press(self) -> None:
         """Handle button press."""
-        _LOGGER.info("Button: Pellets refilled - resetting consumption counter")
+        _LOGGER.info("Button: Pellets refilled - resetting per-refill consumption counter")
         
         # Get current consumption before reset for logging
         consumed = 0
+        consumed_total = 0
         if self.coordinator.data and "pellets" in self.coordinator.data:
             consumed = self.coordinator.data["pellets"].get("consumed", 0)
+            consumed_total = self.coordinator.data["pellets"].get("consumed_total", 0)
         
-        # Reset pellet consumption
+        # Reset pellet consumption (only per-refill counter)
         self.coordinator.refill_pellets()
         
         _LOGGER.info(
-            "Button: Consumption reset from %.1f kg, refill counter: %d",
+            "Button: Per-refill consumption reset from %.1f kg, total since cleaning: %.1f kg",
             consumed,
-            self.coordinator._refill_counter
+            consumed_total
         )
         
         # Request immediate update
@@ -198,22 +200,25 @@ class AduroCleanStoveButton(AduroButtonBase):
         pellets = self.coordinator.data["pellets"]
         
         return {
-            "refills_before_clean": pellets.get("refill_counter", 0),
+            "total_consumed_before_cleaning": round(pellets.get("consumed_total", 0), 1),
+            "consumed_since_refill": round(pellets.get("consumed", 0), 1),
         }
 
     async def async_press(self) -> None:
         """Handle button press."""
-        _LOGGER.info("Button: Stove cleaned - resetting refill counter")
+        _LOGGER.info("Button: Stove cleaned - resetting total consumption counter")
         
         # Get current counter before reset for logging
-        counter = self.coordinator._refill_counter
+        consumed_total = 0
+        if self.coordinator.data and "pellets" in self.coordinator.data:
+            consumed_total = self.coordinator.data["pellets"].get("consumed_total", 0)
         
-        # Reset refill counter
+        # Reset total consumption counter
         self.coordinator.reset_refill_counter()
         
         _LOGGER.info(
-            "Button: Refill counter reset from %d to 0 after cleaning",
-            counter
+            "Button: Total consumption counter reset from %.1f kg to 0 after cleaning",
+            consumed_total
         )
         
         # Request immediate update
