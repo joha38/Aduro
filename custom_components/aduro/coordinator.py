@@ -1480,15 +1480,15 @@ class AduroCoordinator(DataUpdateCoordinator):
         return True
 
     async def async_resume_after_wood_mode(self) -> bool:
-        """Resume pellet operation after wood mode (state 9 or 14)."""
+        """Resume pellet operation after wood mode (state 9)."""
         if not self.data or "operating" not in self.data:
             _LOGGER.error("No data available to resume after wood mode")
             return False
         
         current_state = self.data["operating"].get("state")
         
-        # Check if stove is in wood mode (state 9 or 14)
-        if current_state not in ["9", "14"]:
+        # Check if stove is in wood mode (state 9)
+        if current_state not in ["9"]:
             _LOGGER.warning(
                 "Cannot resume - stove not in wood mode (current state: %s)",
                 current_state
