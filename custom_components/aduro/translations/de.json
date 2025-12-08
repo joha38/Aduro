@@ -243,7 +243,18 @@
         "name": "Änderung wird durchgeführt"
       },
       "display_format": {
-        "name": "Anzeigeformat"
+        "name": "Visningsformat",
+        "state_attributes": {
+          "heatlevel_format": {
+            "name": "Heizstufe (Raumtemp.): {display_target} ({current_temperature})°C"
+          },
+          "temperature_format": {
+            "name": "Zieltemp. (Raumtemp.): {display_target} ({current_temperature})°C"
+          },
+          "wood_mode": {
+            "name": "Holzmodus"
+          }
+        }
       },
       "display_target": {
         "name": "Anzeigeziel"
