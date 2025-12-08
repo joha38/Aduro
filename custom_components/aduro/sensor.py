@@ -732,20 +732,36 @@ class AduroPelletConsumptionTotalSensor(AduroSensorBase):
 
 
 class AduroPelletRefillCounterSensor(AduroSensorBase):
-    """Sensor for pellet refill counter."""
+    """Sensor for total pellet consumption since last cleaning."""
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "refill_counter", "refill_counter")
-        self._attr_state_class = SensorStateClass.TOTAL
+        super().__init__(coordinator, entry, "consumption_since_cleaning", "consumption_since_cleaning")
+        self._attr_device_class = SensorDeviceClass.WEIGHT
+        self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
+        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
         self._attr_icon = "mdi:counter"
 
     @property
-    def native_value(self) -> int | None:
-        """Return the refill counter."""
+    def native_value(self) -> float | None:
+        """Return the total consumption since last cleaning."""
         if self.coordinator.data and "pellets" in self.coordinator.data:
-            return self.coordinator.data["pellets"].get("refill_counter", 0)
+            return round(self.coordinator.data["pellets"].get("consumed_total", 0), 1)
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        if not self.coordinator.data or "pellets" not in self.coordinator.data:
+            return {}
+        
+        pellets = self.coordinator.data["pellets"]
+        
+        return {
+            "consumed_since_refill": round(pellets.get("consumed", 0), 1),
+            "consumed_since_cleaning": round(pellets.get("consumed_total", 0), 1),
+            "pellet_capacity": pellets.get("capacity", 0),
+        }
 
 
 # =============================================================================
