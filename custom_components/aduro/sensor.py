@@ -23,6 +23,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import translation as trans_helper
 
 from .const import (
     DOMAIN,
@@ -1263,19 +1264,94 @@ class AduroChangeInProgressSensor(AduroSensorBase):
 
 
 class AduroDisplayFormatSensor(AduroSensorBase):
-    """Sensor for formatted display text."""
+    """Sensor for formatted display string."""
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "display_format", "display_format")
-        self._attr_icon = "mdi:format-text"
+        self._attr_translation_key = "display_format"
+        self._translations_loaded = False
+        self._translations = {}
+
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass."""
+        await super().async_added_to_hass()
+        await self._load_translations()
+
+    async def _load_translations(self) -> None:
+        """Load translations for the current language."""
+        try:
+            language = self.hass.config.language
+            self._translations = await trans_helper.async_get_translations(
+                self.hass,
+                language,
+                "entity",
+                {DOMAIN},
+            )
+            self._translations_loaded = True
+            _LOGGER.debug("Loaded translations for language: %s", language)
+        except Exception as err:
+            _LOGGER.warning("Failed to load translations: %s", err)
+            self._translations_loaded = False
+
+    def _get_translation(self, key: str) -> str | None:
+        """Get translation for a key."""
+        full_key = f"component.{DOMAIN}.entity.sensor.display_format.state_attributes.{key}.name"
+        return self._translations.get(full_key)
 
     @property
     def native_value(self) -> str | None:
-        """Return the formatted display text."""
-        if self.coordinator.data and "calculated" in self.coordinator.data:
-            return self.coordinator.data["calculated"].get("display_format", "")
-        return None
+        """Return the formatted display string."""
+        if not self.coordinator.data or "calculated" not in self.coordinator.data:
+            return None
+        
+        calculated = self.coordinator.data["calculated"]
+        display_target_type = calculated.get("display_target_type")
+        display_target = calculated.get("display_target")
+        current_temperature = calculated.get("current_temperature")
+        
+        # Determine which translation key to use
+        if display_target_type == "heatlevel":
+            trans_key = "heatlevel_format"
+            fallback = f"Heat Level (room temp.): {display_target} ({current_temperature})°C"
+        elif display_target_type == "temperature":
+            trans_key = "temperature_format"
+            fallback = f"Target temp. (room temp.): {display_target} ({current_temperature})°C"
+        else:
+            trans_key = "wood_mode"
+            fallback = "Wood Mode"
+        
+        # Try to get translated string
+        if self._translations_loaded:
+            template = self._get_translation(trans_key)
+            if template:
+                try:
+                    # Replace placeholders if present
+                    if display_target_type != "wood":
+                        return template.format(
+                            display_target=display_target,
+                            current_temperature=current_temperature
+                        )
+                    return template
+                except (KeyError, ValueError) as err:
+                    _LOGGER.debug("Failed to format translation: %s", err)
+        
+        # Return fallback (English)
+        return fallback
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        if not self.coordinator.data or "calculated" not in self.coordinator.data:
+            return {}
+        
+        calculated = self.coordinator.data["calculated"]
+        
+        return {
+            "display_target": calculated.get("display_target"),
+            "target_type": calculated.get("display_target_type"),
+            "current_temperature": calculated.get("current_temperature"),
+        }
 
 
 class AduroDisplayTargetSensor(AduroSensorBase):
@@ -1471,4 +1547,3 @@ class AduroLowWoodTempAlertSensor(AduroSensorBase):
                 attrs["exceeded_by_minutes"] = round(time_info["exceeded_by"] / 60, 1)
         
         return attrs
-
