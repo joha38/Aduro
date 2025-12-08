@@ -298,7 +298,7 @@ class AduroResumeAfterWoodButton(AduroButtonBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the button."""
-        super().__init__(coordinator, entry, "resume_after_wood", "resume_after_wood")
+        super().__init__(coordinator, entry, "resume_after_wood_mode", "resume_after_wood_mode")
         self._attr_icon = "mdi:play-circle"
 
     @property
