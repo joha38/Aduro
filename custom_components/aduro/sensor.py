@@ -323,45 +323,154 @@ class AduroStateSensor(AduroSensorBase):
 
 
 class AduroSubstateSensor(AduroSensorBase):
-    """Sensor for stove substate."""
+    """Sensor for stove substate with live timer countdown."""
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "substate", "substate")
         self._attr_icon = "mdi:state-machine"
-        self._attr_device_class = SensorDeviceClass.ENUM
-        self._attr_options = [
-            "substate_waiting",
-            "substate_ignition_1",
-            "substate_ignition_2",
-            "substate_normal",
-            "substate_temp_reached",
-            "substate_wood_burning",
-            "substate_dropshaft_hot",
-            "substate_failed_ignition",
-            "substate_by_button",
-            "substate_wood_burning_question",
-            "substate_no_fuel",
-            "substate_door_open",
-            "substate_heating_up",
-            "substate_check_burn_cup",
-        ]
+        # Remove device_class ENUM since we'll be showing custom formatted text with timer
+        # self._attr_device_class = SensorDeviceClass.ENUM
+        # self._attr_options = [...]
+        self._timer_update_task = None
+        self._unsub_timer = None
+        self._translations = {}
+        self._translations_loaded = False
+
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass."""
+        await super().async_added_to_hass()
+        await self._load_translations()
+        
+        # Use event helpers for timer updates
+        from homeassistant.helpers.event import async_track_time_interval
+        from datetime import timedelta
+        
+        # Update every second when timer is active
+        self._unsub_timer = async_track_time_interval(
+            self.hass,
+            self._timer_tick,
+            timedelta(seconds=1)
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """When entity is being removed from hass."""
+        # Cancel the timer
+        if self._unsub_timer:
+            self._unsub_timer()
+            self._unsub_timer = None
+        await super().async_will_remove_from_hass()
+
+    async def _load_translations(self) -> None:
+        """Load translations for the current language."""
+        try:
+            language = self.hass.config.language
+            self._translations = await trans_helper.async_get_translations(
+                self.hass,
+                language,
+                "entity",
+                {DOMAIN},
+            )
+            self._translations_loaded = True
+            _LOGGER.debug("Loaded translations for language: %s", language)
+        except Exception as err:
+            _LOGGER.warning("Failed to load translations: %s", err)
+            self._translations_loaded = False
+
+    async def _timer_tick(self, now=None):
+        """Timer tick callback."""
+        try:
+            # Only update if timer is active
+            if self._should_update_timer():
+                self.async_write_ha_state()
+        except Exception as err:
+            _LOGGER.error("Error in timer tick: %s", err)
+
+    def _should_update_timer(self) -> bool:
+        """Check if timer is active and needs updating."""
+        if not self.coordinator.data or "operating" not in self.coordinator.data:
+            return False
+        
+        state = self.coordinator.data["operating"].get("state")
+        
+        # Timer is active during state 2 or 4
+        return state in ["2", "4"]
+
+    def _get_live_remaining_time(self, state: str) -> int | None:
+        """Calculate live remaining time for current state."""
+        from datetime import datetime
+        from .const import TIMER_STARTUP_1, TIMER_STARTUP_2
+        
+        try:
+            if state == "2" and self.coordinator._timer_startup_1_started:
+                elapsed = (datetime.now() - self.coordinator._timer_startup_1_started).total_seconds()
+                return max(0, TIMER_STARTUP_1 - int(elapsed))
+            
+            elif state == "4" and self.coordinator._timer_startup_2_started:
+                elapsed = (datetime.now() - self.coordinator._timer_startup_2_started).total_seconds()
+                return max(0, TIMER_STARTUP_2 - int(elapsed))
+        except (TypeError, AttributeError) as err:
+            _LOGGER.debug("Error calculating live timer: %s", err)
+        
+        return None
+
+    def _get_translated_text(self, translation_key: str) -> str:
+        """Get translated text for a key."""
+        full_key = f"component.{DOMAIN}.entity.sensor.substate.state.{translation_key}"
+        
+        if self._translations_loaded and full_key in self._translations:
+            return self._translations[full_key]
+        
+        # Fallback to display names from const.py
+        return SUBSTATE_NAMES_DISPLAY.get(translation_key.replace("substate_", ""), translation_key)
 
     @property
     def native_value(self) -> str | None:
-        """Return the substate translation key."""
-        if self.coordinator.data and "operating" in self.coordinator.data:
-            state = self.coordinator.data["operating"].get("state", "")
-            substate = self.coordinator.data["operating"].get("substate", "")
-            
-            # Check for combined state_substate first
-            combined_key = f"{state}_{substate}"
-            if combined_key in SUBSTATE_NAMES:
-                return SUBSTATE_NAMES[combined_key]
+        """Return the substate with live timer countdown when applicable."""
+        if not self.coordinator.data or "operating" not in self.coordinator.data:
+            return None
+        
+        state = self.coordinator.data["operating"].get("state", "")
+        substate = self.coordinator.data["operating"].get("substate", "")
+        
+        # Check for combined state_substate first
+        combined_key = f"{state}_{substate}"
+        if combined_key in SUBSTATE_NAMES:
+            translation_key = SUBSTATE_NAMES[combined_key]
+        else:
             # Fall back to state only
-            return SUBSTATE_NAMES.get(state, "substate_unknown")
-        return None
+            translation_key = SUBSTATE_NAMES.get(state, "substate_unknown")
+        
+        # Get translated text
+        status_text = self._get_translated_text(translation_key)
+        
+        # Add LIVE timer info if applicable
+        if state in ["2", "4"]:
+            remaining = self._get_live_remaining_time(state)
+            if remaining is not None:
+                minutes = remaining // 60
+                seconds = remaining % 60
+                return f"{status_text} ({minutes:02d}:{seconds:02d})"
+        
+        return status_text
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        attrs = {}
+        
+        if not self.coordinator.data or "operating" not in self.coordinator.data:
+            return attrs
+        
+        state = self.coordinator.data["operating"].get("state", "")
+        substate = self.coordinator.data["operating"].get("substate", "")
+        
+        # Add raw state info
+        attrs["raw_state"] = state
+        attrs["raw_substate"] = substate
+        
+        return attrs
+        
 
 class AduroMainStatusSensor(AduroSensorBase):
     """Sensor for main status text."""
