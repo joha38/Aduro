@@ -125,16 +125,6 @@
           "substate_heating_up": "Heating up",
           "substate_check_burn_cup": "Check burn cup",
           "substate_dropshaft_hot": "Dropshaft hot"
-        },
-        "state_attributes": {
-          "timer_display": {
-            "name": "Timer Display"
-          },
-          "remaining_seconds": {
-            "name": "Remaining Seconds"
-          },
-          "remaining_minutes": {
-            "name": "Remaining Minutes"
           }
         }
       },
