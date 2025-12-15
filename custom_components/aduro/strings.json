@@ -125,7 +125,6 @@
           "substate_heating_up": "Heating up",
           "substate_check_burn_cup": "Check burn cup",
           "substate_dropshaft_hot": "Dropshaft hot"
-          }
         }
       },
       "consumption_since_cleaning": {
