@@ -46,10 +46,8 @@ async def async_setup_entry(
 
     sensors = [
         # Status sensors
-        AduroStateSensor(coordinator, entry),
+        AduroMainStateSensor(coordinator, entry),
         AduroSubstateSensor(coordinator, entry),
-        AduroMainStatusSensor(coordinator, entry),
-        AduroSubStatusSensor(coordinator, entry),
         
         # Temperature sensors
         AduroBoilerTempSensor(coordinator, entry),
@@ -215,7 +213,7 @@ class AduroSensorBase(CoordinatorEntity, SensorEntity):
 # Status Sensors
 # =============================================================================
 
-class AduroStateSensor(AduroSensorBase):
+class AduroMainStateSensor(AduroSensorBase):
     """Sensor for stove state."""
 
     # Map heatlevel numbers to Roman numerals
@@ -261,36 +259,26 @@ class AduroStateSensor(AduroSensorBase):
         # Convert heatlevel to Roman numeral
         heatlevel_roman = self.HEATLEVEL_ROMAN.get(heatlevel, "I")
         
-        # Build the full translation key
-        full_key = f"component.{DOMAIN}.entity.sensor.state_disp.state.{translation_key}"
+        # Build the full translation key - NOTE: The path is "state.state.{key}" not "state_disp.state.{key}"
+        full_key = f"component.{DOMAIN}.entity.sensor.state.state.{translation_key}"
         
         # Try to get translation
         if self._translations_loaded and full_key in self._translations:
             template = self._translations[full_key]
             try:
                 # Format with Roman numeral heatlevel
-                return template.format(heatlevel=heatlevel_roman)
+                return template.format(heatlevel_roman=heatlevel_roman)
             except (KeyError, ValueError):
                 return template
         
-        # Fallback to English with Roman numerals
-        fallback_translations = {
-            "state_operating": f"Power {heatlevel_roman}",
-            "state_stopped": "Stopped",
-            "state_off": "Off",
-            "state_operating_iii": "Power III",
-            "state_stopped_draft": "Dropshaft hot",
-            "state_stopped_smoke_sensor": "Bad smoke sensor",
-            "state_stopped_dropshaft": "Bad dropshaft sensor",
-            "state_stopped_burner_yellow": "Check burner yellow",
-            "state_stopped_auger": "bad external auger output",
-            "state_stopped_timer": "Stopped by timer",
-            "state_operating_air_damper": "Air damper closed",
-            "state_stopped_co_sensor": "Co sensor defect",
-            "state_stopped_no_fan": "No power consumption for fan",
-        }
+        # Fallback to display names from const.py
+        fallback = STATE_NAMES_DISPLAY.get(translation_key.replace("state_", ""), translation_key)
         
-        return fallback_translations.get(translation_key, translation_key)
+        # Format fallback if it contains placeholder
+        if "{heatlevel}" in fallback:
+            fallback = fallback.format(heatlevel=heatlevel_roman)
+        
+        return fallback
 
     @property
     def native_value(self) -> str | None:
@@ -304,6 +292,13 @@ class AduroStateSensor(AduroSensorBase):
         # Get translation key from const
         translation_key = STATE_NAMES.get(state, "state_unknown")
         
+        # Log warning for unknown states
+        if state and translation_key is None:
+            _LOGGER.warning(
+                "Unknown stove state detected: %s - Please report this to the integration developer",
+                state
+            )
+
         # Return translated and formatted string with Roman numerals
         return self._get_translated_state(translation_key, heatlevel)
     
@@ -441,6 +436,13 @@ class AduroSubstateSensor(AduroSensorBase):
             # Fall back to state only
             translation_key = SUBSTATE_NAMES.get(state, "substate_unknown")
         
+        # Log warning for unknown states
+        if state and translation_key is None:
+            _LOGGER.warning(
+                "Unknown stove substate detected: state=%s, substate=%s - Please report this to the integration developer",
+                state, substate
+            )
+
         # Get translated text
         status_text = self._get_translated_text(translation_key)
         
@@ -471,169 +473,6 @@ class AduroSubstateSensor(AduroSensorBase):
         
         return attrs
         
-
-class AduroMainStatusSensor(AduroSensorBase):
-    """Sensor for main status text."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "status_main", "status_main")
-        self._attr_icon = "mdi:information"
-
-    @property
-    def native_value(self) -> str | None:
-        """Return the main status text."""
-        if not self.coordinator.data or "operating" not in self.coordinator.data:
-            return None
-        
-        state = self.coordinator.data["operating"].get("state", "")
-        heatlevel = self.coordinator.data["operating"].get("heatlevel", 1)
-        
-        # Get translation key
-        state_key = STATE_NAMES.get(state)
-        
-        # Log warning for unknown states
-        if state and state_key is None:
-            _LOGGER.warning(
-                "Unknown stove state detected: %s - Please report this to the integration developer",
-                state
-            )
-        
-        # For now, use display version as Home Assistant doesn't support 
-        # format strings in state translations yet
-        if state_key:
-            from .const import STATE_NAMES_DISPLAY
-            status_template = STATE_NAMES_DISPLAY.get(state, f"Unknown State {state}")
-        else:
-            from .const import STATE_NAMES_DISPLAY
-            status_template = STATE_NAMES_DISPLAY.get(state, f"Unknown State {state}")
-        
-        # Format with heatlevel if needed
-        if "{heatlevel}" in status_template:
-            heatlevel_display = HEAT_LEVEL_DISPLAY.get(heatlevel, str(heatlevel))
-            return status_template.format(heatlevel=heatlevel_display)
-        
-        return status_template
-
-    @property
-    def icon(self) -> str:
-        """Return icon based on operation mode."""
-        if not self.coordinator.data or "status" not in self.coordinator.data:
-            return "mdi:help-circle"
-        
-        mode = self.coordinator.data["status"].get("operation_mode", 0)
-        if mode == 1:
-            return "mdi:thermometer"
-        elif mode == 0:
-            return "mdi:fire"
-        else:
-            return "mdi:campfire"
-
-
-class AduroSubStatusSensor(AduroSensorBase):
-    """Sensor for sub status text with live timer countdown."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "status_sub", "status_sub")
-        self._attr_icon = "mdi:information-outline"
-        self._timer_update_task = None
-        self._unsub_timer = None
-
-    async def async_added_to_hass(self) -> None:
-        """When entity is added to hass."""
-        await super().async_added_to_hass()
-        # Use event helpers instead of a background task
-        from homeassistant.helpers.event import async_track_time_interval
-        from datetime import timedelta
-        
-        # Update every second when timer is active
-        self._unsub_timer = async_track_time_interval(
-            self.hass,
-            self._timer_tick,
-            timedelta(seconds=1)
-        )
-
-    async def async_will_remove_from_hass(self) -> None:
-        """When entity is being removed from hass."""
-        # Cancel the timer
-        if self._unsub_timer:
-            self._unsub_timer()
-            self._unsub_timer = None
-        await super().async_will_remove_from_hass()
-
-    async def _timer_tick(self, now=None):
-        """Timer tick callback."""
-        try:
-            # Only update if timer is active
-            if self._should_update_timer():
-                self.async_write_ha_state()
-        except Exception as err:
-            _LOGGER.error("Error in timer tick: %s", err)
-
-    def _should_update_timer(self) -> bool:
-        """Check if timer is active and needs updating."""
-        if not self.coordinator.data or "operating" not in self.coordinator.data:
-            return False
-        
-        state = self.coordinator.data["operating"].get("state")
-        
-        # Timer is active during state 2 or 4
-        return state in ["2", "4"]
-
-    def _get_live_remaining_time(self, state: str) -> int | None:
-        """Calculate live remaining time for current state."""
-        from datetime import datetime
-        from .const import TIMER_STARTUP_1, TIMER_STARTUP_2
-        
-        try:
-            if state == "2" and self.coordinator._timer_startup_1_started:
-                elapsed = (datetime.now() - self.coordinator._timer_startup_1_started).total_seconds()
-                return max(0, TIMER_STARTUP_1 - int(elapsed))
-            
-            elif state == "4" and self.coordinator._timer_startup_2_started:
-                elapsed = (datetime.now() - self.coordinator._timer_startup_2_started).total_seconds()
-                return max(0, TIMER_STARTUP_2 - int(elapsed))
-        except (TypeError, AttributeError) as err:
-            _LOGGER.debug("Error calculating live timer: %s", err)
-        
-        return None
-
-    @property
-    def native_value(self) -> str | None:
-        """Return the sub status text with live timer countdown."""
-        if not self.coordinator.data or "operating" not in self.coordinator.data:
-            return None
-        
-        state = self.coordinator.data["operating"].get("state", "")
-        substate = self.coordinator.data["operating"].get("substate", "")
-        
-        # Check for combined state_substate first
-        combined_key = f"{state}_{substate}"
-        if combined_key in SUBSTATE_NAMES:
-            from .const import SUBSTATE_NAMES_DISPLAY
-            status = SUBSTATE_NAMES_DISPLAY.get(combined_key, f"Unknown State {state}/{substate}")
-        else:
-            # Fall back to state only
-            from .const import SUBSTATE_NAMES_DISPLAY
-            status = SUBSTATE_NAMES_DISPLAY.get(state, f"Unknown State {state}")
-            
-            # Log warning for unknown substates
-            if state and state not in SUBSTATE_NAMES_DISPLAY:
-                _LOGGER.warning(
-                    "Unknown stove substate detected: state=%s, substate=%s - Please report this to the integration developer",
-                    state, substate
-                )
-        
-        # Add LIVE timer info if applicable
-        if state in ["2", "4"]:
-            remaining = self._get_live_remaining_time(state)
-            if remaining is not None:
-                minutes = remaining // 60
-                seconds = remaining % 60
-                return f"{status} ({minutes:02d}:{seconds:02d})"
-        
-        return status
 
 
 # =============================================================================
