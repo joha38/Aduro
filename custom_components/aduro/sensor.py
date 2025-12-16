@@ -762,7 +762,7 @@ class AduroPelletRefillCounterSensor(AduroSensorBase):
         self._attr_device_class = SensorDeviceClass.WEIGHT
         self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
-        self._attr_icon = "mdi:counter"
+        self._attr_icon = "mdi:grain"
 
     @property
     def native_value(self) -> float | None:
@@ -1451,7 +1451,7 @@ class AduroHighSmokeTempAlertSensor(AduroSensorBase):
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "high_smoke_temp_alert", "high_smoke_temp_alert")
-        self._attr_icon = "mdi:alert-circle"
+        self._attr_icon = "mdi:thermometer-alert"
 
     @property
     def native_value(self) -> str:
@@ -1512,7 +1512,7 @@ class AduroLowWoodTempAlertSensor(AduroSensorBase):
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "low_wood_temp_alert", "low_wood_temp_alert")
-        self._attr_icon = "mdi:alert-circle"
+        self._attr_icon = "mdi:thermometer-low"
 
     @property
     def native_value(self) -> str:
