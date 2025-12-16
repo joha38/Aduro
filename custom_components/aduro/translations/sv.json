@@ -229,13 +229,13 @@
         "name": "Tändningstimer 2"
       },
       "operating_time_stove": {
-        "name": "Total Drifttid"
+        "name": "Drifttid total"
       },
       "operating_time_auger": {
-        "name": "Skruv Drifttid"
+        "name": "Drifttid skruv"
       },
       "operating_time_ignition": {
-        "name": "Tändnings Drifttid"
+        "name": "Drifttid tändning"
       },
       "mode_transition": {
         "name": "Lägesövergång"
