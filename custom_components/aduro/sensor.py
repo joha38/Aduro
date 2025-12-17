@@ -46,10 +46,8 @@ async def async_setup_entry(
 
     sensors = [
         # Status sensors
-        AduroStateSensor(coordinator, entry),
+        AduroMainStateSensor(coordinator, entry),
         AduroSubstateSensor(coordinator, entry),
-        AduroMainStatusSensor(coordinator, entry),
-        AduroSubStatusSensor(coordinator, entry),
         
         # Temperature sensors
         AduroBoilerTempSensor(coordinator, entry),
@@ -215,153 +213,131 @@ class AduroSensorBase(CoordinatorEntity, SensorEntity):
 # Status Sensors
 # =============================================================================
 
-class AduroStateSensor(AduroSensorBase):
+class AduroMainStateSensor(AduroSensorBase):
     """Sensor for stove state."""
+
+    # Map heatlevel numbers to Roman numerals
+    HEATLEVEL_ROMAN = {
+        1: "I",
+        2: "II",
+        3: "III",
+    }
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "state", "state")
         self._attr_icon = "mdi:state-machine"
-        self._attr_device_class = SensorDeviceClass.ENUM
-        self._attr_options = [
-            "state_operating",
-            "state_stopped",
-            "state_off",
-            "state_operating_iii",
-            "state_stopped_draft",
-            "state_stopped_smoke_sensor",
-            "state_stopped_dropshaft",
-            "state_stopped_burner_yellow",
-            "state_stopped_auger",
-            "state_stopped_timer",
-            "state_operating_air_damper",
-            "state_stopped_co_sensor",
-            "state_stopped_no_fan",
-        ]
+        # DON'T use device_class ENUM when you want to return translated strings
+        # self._attr_device_class = SensorDeviceClass.ENUM
+        # self._attr_options = [...]
+        self._translations = {}
+        self._translations_loaded = False
+
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass."""
+        await super().async_added_to_hass()
+        await self._load_translations()
+
+    async def _load_translations(self) -> None:
+        """Load translations for the current language."""
+        try:
+            language = self.hass.config.language
+            self._translations = await trans_helper.async_get_translations(
+                self.hass,
+                language,
+                "entity",
+                {DOMAIN},
+            )
+            self._translations_loaded = True
+            _LOGGER.debug("Loaded translations for language: %s", language)
+        except Exception as err:
+            _LOGGER.warning("Failed to load translations: %s", err)
+            self._translations_loaded = False
+
+    def _get_translated_state(self, translation_key: str, heatlevel: int = 1) -> str:
+        """Get translated state string with formatting."""
+        # Convert heatlevel to Roman numeral
+        heatlevel_roman = self.HEATLEVEL_ROMAN.get(heatlevel, "I")
+        
+        # Build the full translation key - NOTE: The path is "state.state.{key}" not "state_disp.state.{key}"
+        full_key = f"component.{DOMAIN}.entity.sensor.state.state.{translation_key}"
+        
+        # Try to get translation
+        if self._translations_loaded and full_key in self._translations:
+            template = self._translations[full_key]
+            try:
+                # Format with Roman numeral heatlevel
+                return template.format(heatlevel_roman=heatlevel_roman)
+            except (KeyError, ValueError):
+                return template
+        
+        # Fallback to display names from const.py
+        fallback = STATE_NAMES_DISPLAY.get(translation_key.replace("state_", ""), translation_key)
+        
+        # Format fallback if it contains placeholder
+        if "{heatlevel}" in fallback:
+            fallback = fallback.format(heatlevel=heatlevel_roman)
+        
+        return fallback
 
     @property
     def native_value(self) -> str | None:
-        """Return the state translation key."""
-        if self.coordinator.data and "operating" in self.coordinator.data:
-            state = self.coordinator.data["operating"].get("state")
-            # Return translation key
-            return STATE_NAMES.get(state, "state_unknown")
-        return None
+        """Return the translated and formatted state."""
+        if not self.coordinator.data or "operating" not in self.coordinator.data:
+            return None
+        
+        state = self.coordinator.data["operating"].get("state")
+        heatlevel = self.coordinator.data["operating"].get("heatlevel", 1)
+        
+        # Get translation key from const
+        translation_key = STATE_NAMES.get(state, "state_unknown")
+        
+        # Log warning for unknown states
+        if state and translation_key is None:
+            _LOGGER.warning(
+                "Unknown stove state detected: %s - Please report this to the integration developer",
+                state
+            )
+
+        # Return translated and formatted string with Roman numerals
+        return self._get_translated_state(translation_key, heatlevel)
+    
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        if not self.coordinator.data or "operating" not in self.coordinator.data:
+            return {}
+        
+        heatlevel = self.coordinator.data["operating"].get("heatlevel", 1)
+        
+        return {
+            "heatlevel": heatlevel,
+            "heatlevel_roman": self.HEATLEVEL_ROMAN.get(heatlevel, "I"),
+            "raw_state": self.coordinator.data["operating"].get("state"),
+        }
 
 
 class AduroSubstateSensor(AduroSensorBase):
-    """Sensor for stove substate."""
+    """Sensor for stove substate with live timer countdown."""
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "substate", "substate")
         self._attr_icon = "mdi:state-machine"
-        self._attr_device_class = SensorDeviceClass.ENUM
-        self._attr_options = [
-            "substate_waiting",
-            "substate_ignition_1",
-            "substate_ignition_2",
-            "substate_normal",
-            "substate_temp_reached",
-            "substate_wood_burning",
-            "substate_dropshaft_hot",
-            "substate_failed_ignition",
-            "substate_by_button",
-            "substate_wood_burning_question",
-            "substate_no_fuel",
-            "substate_door_open",
-            "substate_heating_up",
-            "substate_check_burn_cup",
-        ]
-
-    @property
-    def native_value(self) -> str | None:
-        """Return the substate translation key."""
-        if self.coordinator.data and "operating" in self.coordinator.data:
-            state = self.coordinator.data["operating"].get("state", "")
-            substate = self.coordinator.data["operating"].get("substate", "")
-            
-            # Check for combined state_substate first
-            combined_key = f"{state}_{substate}"
-            if combined_key in SUBSTATE_NAMES:
-                return SUBSTATE_NAMES[combined_key]
-            # Fall back to state only
-            return SUBSTATE_NAMES.get(state, "substate_unknown")
-        return None
-
-
-class AduroMainStatusSensor(AduroSensorBase):
-    """Sensor for main status text."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "status_main", "status_main")
-        self._attr_icon = "mdi:information"
-
-    @property
-    def native_value(self) -> str | None:
-        """Return the main status text."""
-        if not self.coordinator.data or "operating" not in self.coordinator.data:
-            return None
-        
-        state = self.coordinator.data["operating"].get("state", "")
-        heatlevel = self.coordinator.data["operating"].get("heatlevel", 1)
-        
-        # Get translation key
-        state_key = STATE_NAMES.get(state)
-        
-        # Log warning for unknown states
-        if state and state_key is None:
-            _LOGGER.warning(
-                "Unknown stove state detected: %s - Please report this to the integration developer",
-                state
-            )
-        
-        # For now, use display version as Home Assistant doesn't support 
-        # format strings in state translations yet
-        if state_key:
-            from .const import STATE_NAMES_DISPLAY
-            status_template = STATE_NAMES_DISPLAY.get(state, f"Unknown State {state}")
-        else:
-            from .const import STATE_NAMES_DISPLAY
-            status_template = STATE_NAMES_DISPLAY.get(state, f"Unknown State {state}")
-        
-        # Format with heatlevel if needed
-        if "{heatlevel}" in status_template:
-            heatlevel_display = HEAT_LEVEL_DISPLAY.get(heatlevel, str(heatlevel))
-            return status_template.format(heatlevel=heatlevel_display)
-        
-        return status_template
-
-    @property
-    def icon(self) -> str:
-        """Return icon based on operation mode."""
-        if not self.coordinator.data or "status" not in self.coordinator.data:
-            return "mdi:help-circle"
-        
-        mode = self.coordinator.data["status"].get("operation_mode", 0)
-        if mode == 1:
-            return "mdi:thermometer"
-        elif mode == 0:
-            return "mdi:fire"
-        else:
-            return "mdi:campfire"
-
-
-class AduroSubStatusSensor(AduroSensorBase):
-    """Sensor for sub status text with live timer countdown."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "status_sub", "status_sub")
-        self._attr_icon = "mdi:information-outline"
+        # Remove device_class ENUM since we'll be showing custom formatted text with timer
+        # self._attr_device_class = SensorDeviceClass.ENUM
+        # self._attr_options = [...]
         self._timer_update_task = None
         self._unsub_timer = None
+        self._translations = {}
+        self._translations_loaded = False
 
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""
         await super().async_added_to_hass()
-        # Use event helpers instead of a background task
+        await self._load_translations()
+        
+        # Use event helpers for timer updates
         from homeassistant.helpers.event import async_track_time_interval
         from datetime import timedelta
         
@@ -379,6 +355,22 @@ class AduroSubStatusSensor(AduroSensorBase):
             self._unsub_timer()
             self._unsub_timer = None
         await super().async_will_remove_from_hass()
+
+    async def _load_translations(self) -> None:
+        """Load translations for the current language."""
+        try:
+            language = self.hass.config.language
+            self._translations = await trans_helper.async_get_translations(
+                self.hass,
+                language,
+                "entity",
+                {DOMAIN},
+            )
+            self._translations_loaded = True
+            _LOGGER.debug("Loaded translations for language: %s", language)
+        except Exception as err:
+            _LOGGER.warning("Failed to load translations: %s", err)
+            self._translations_loaded = False
 
     async def _timer_tick(self, now=None):
         """Timer tick callback."""
@@ -417,9 +409,19 @@ class AduroSubStatusSensor(AduroSensorBase):
         
         return None
 
+    def _get_translated_text(self, translation_key: str) -> str:
+        """Get translated text for a key."""
+        full_key = f"component.{DOMAIN}.entity.sensor.substate.state.{translation_key}"
+        
+        if self._translations_loaded and full_key in self._translations:
+            return self._translations[full_key]
+        
+        # Fallback to display names from const.py
+        return SUBSTATE_NAMES_DISPLAY.get(translation_key.replace("substate_", ""), translation_key)
+
     @property
     def native_value(self) -> str | None:
-        """Return the sub status text with live timer countdown."""
+        """Return the substate with live timer countdown when applicable."""
         if not self.coordinator.data or "operating" not in self.coordinator.data:
             return None
         
@@ -429,19 +431,20 @@ class AduroSubStatusSensor(AduroSensorBase):
         # Check for combined state_substate first
         combined_key = f"{state}_{substate}"
         if combined_key in SUBSTATE_NAMES:
-            from .const import SUBSTATE_NAMES_DISPLAY
-            status = SUBSTATE_NAMES_DISPLAY.get(combined_key, f"Unknown State {state}/{substate}")
+            translation_key = SUBSTATE_NAMES[combined_key]
         else:
             # Fall back to state only
-            from .const import SUBSTATE_NAMES_DISPLAY
-            status = SUBSTATE_NAMES_DISPLAY.get(state, f"Unknown State {state}")
-            
-            # Log warning for unknown substates
-            if state and state not in SUBSTATE_NAMES_DISPLAY:
-                _LOGGER.warning(
-                    "Unknown stove substate detected: state=%s, substate=%s - Please report this to the integration developer",
-                    state, substate
-                )
+            translation_key = SUBSTATE_NAMES.get(state, "substate_unknown")
+        
+        # Log warning for unknown states
+        if state and translation_key is None:
+            _LOGGER.warning(
+                "Unknown stove substate detected: state=%s, substate=%s - Please report this to the integration developer",
+                state, substate
+            )
+
+        # Get translated text
+        status_text = self._get_translated_text(translation_key)
         
         # Add LIVE timer info if applicable
         if state in ["2", "4"]:
@@ -449,9 +452,27 @@ class AduroSubStatusSensor(AduroSensorBase):
             if remaining is not None:
                 minutes = remaining // 60
                 seconds = remaining % 60
-                return f"{status} ({minutes:02d}:{seconds:02d})"
+                return f"{status_text} ({minutes:02d}:{seconds:02d})"
         
-        return status
+        return status_text
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        attrs = {}
+        
+        if not self.coordinator.data or "operating" not in self.coordinator.data:
+            return attrs
+        
+        state = self.coordinator.data["operating"].get("state", "")
+        substate = self.coordinator.data["operating"].get("substate", "")
+        
+        # Add raw state info
+        attrs["raw_state"] = state
+        attrs["raw_substate"] = substate
+        
+        return attrs
+        
 
 
 # =============================================================================
@@ -741,7 +762,7 @@ class AduroPelletRefillCounterSensor(AduroSensorBase):
         self._attr_device_class = SensorDeviceClass.WEIGHT
         self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
-        self._attr_icon = "mdi:counter"
+        self._attr_icon = "mdi:grain"
 
     @property
     def native_value(self) -> float | None:
@@ -1237,12 +1258,14 @@ class AduroModeTransitionSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "mode_transition", "mode_transition")
         self._attr_icon = "mdi:state-machine"
+        self._last_logged_value = None
 
     @property
     def native_value(self) -> str | None:
         """Return the mode transition state."""
         if self.coordinator.data and "calculated" in self.coordinator.data:
-            return self.coordinator.data["calculated"].get("mode_transition", "idle")
+            value = self.coordinator.data["calculated"].get("mode_transition", "idle")
+            return value
         return "idle"
 
 
@@ -1253,13 +1276,15 @@ class AduroChangeInProgressSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "change_in_progress", "change_in_progress")
         self._attr_icon = "mdi:sync"
+        self._last_logged_value = None
 
     @property
     def native_value(self) -> str | None:
         """Return true/false as string."""
         if self.coordinator.data and "calculated" in self.coordinator.data:
             in_progress = self.coordinator.data["calculated"].get("change_in_progress", False)
-            return "true" if in_progress else "false"
+            value = "true" if in_progress else "false"            
+            return value
         return "false"
 
 
@@ -1426,7 +1451,7 @@ class AduroHighSmokeTempAlertSensor(AduroSensorBase):
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "high_smoke_temp_alert", "high_smoke_temp_alert")
-        self._attr_icon = "mdi:alert-circle"
+        self._attr_icon = "mdi:thermometer-alert"
 
     @property
     def native_value(self) -> str:
@@ -1487,7 +1512,7 @@ class AduroLowWoodTempAlertSensor(AduroSensorBase):
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "low_wood_temp_alert", "low_wood_temp_alert")
-        self._attr_icon = "mdi:alert-circle"
+        self._attr_icon = "mdi:thermometer-low"
 
     @property
     def native_value(self) -> str:

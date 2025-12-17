@@ -265,7 +265,6 @@ class AduroAutoShutdownSwitch(AduroSwitchBase):
         await self.coordinator.async_save_pellet_data()
         await self.coordinator.async_request_refresh()
 
-
 class AduroAutoResumeAfterWoodSwitch(AduroSwitchBase):
     """Switch to enable/disable automatic resume after wood mode."""
 

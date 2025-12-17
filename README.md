@@ -50,7 +50,10 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 
 🌍 **Multi-Language Support**
 - English
-- Swedish (Svenska)
+- Danish
+- French
+- German
+- Swedish
 - Easy to add more languages
 
 ## Supported Models
@@ -172,7 +175,7 @@ To customize settings after setup:
 - **Pellets Remaining** - Remaining pellets (kg)
 - **Pellets Percentage** - Remaining pellets (%)
 - **Pellets Consumed** - Consumed since last refill (kg)
-- **Refill Counter** - Refills since cleaning
+- **Pellets Consumed Since Cleaning** - Consumed since cleaning (kg)
 
 #### Consumption
 - **Today's Consumption** - Current day (kg)
@@ -204,8 +207,8 @@ To customize settings after setup:
 ### Switches (3)
 
 - **Power** - Start/Stop the stove
-- **Auto Shutdown at Low Pellets** - Enable automatic shutdown
-- **Auto Resume After Wood Mode** - Enable automatic resume
+- **Auto Shutdown at Low Pellets** - Enable automatic shutdown at a certain pellets level and time
+- **Auto Resume After Wood Mode** - Enable automatic resume when in heat level mode
 
 ### Numbers (9)
 
@@ -499,7 +502,7 @@ See [ADDING_STATES.md](ADDING_STATES.md) for details.
 
 ## Development plans/wish list
 
-- For Alpha-releases: test that all functions are working as intended.
+- For beta-releases: test that all functions are working as intended.
 - Update integration with all relevant translations between state/substates-numbers and their related text string.
 - Get confirmation/information about the remaining Aduro hybrid stoves.
 - Estimation of pellets consumption over time, depending on temperature settings, heat level settings, outside temperature and other relevant factors to estimate a time for when the stove have consumed all pellets.
@@ -509,18 +512,28 @@ See [ADDING_STATES.md](ADDING_STATES.md) for details.
 
 A custom and optional Lovelace card for controlling Aduro Hybrid Stoves in Home Assistant can be found here: [Aduro Stove Card](https://github.com/NewImproved/Aduro-Stove-Card)
 
-![Aduro Stove Card](https://github.com/NewImproved/Aduro-Stove-Card/blob/main/Aduro_stove_card.png)
+<img width="506" height="737" alt="image" src="https://github.com/user-attachments/assets/cded111a-f0ad-4f3e-81bf-48fa15ca4b49" />
+
 
 ### Features
 
 - **Real-time Status Display** - Shows current stove state and operation mode
 - **Temperature & Heat Level Control** - Easy +/- buttons for quick adjustments
-- **Pellet Monitoring** - Visual pellet level indicator with refill counter
+- **Pellet Monitoring** - Visual pellet level indicator and a consumption since cleaning indicator
+- **CO level** - CO level indicator with the yellow and red thresholds
 - **Power Control** - Start/stop the stove with a single tap
 - **Mode Toggle** - Switch between Heat Level and Temperature modes
 - **Auto-Resume & Auto-Shutdown** - Configure automatic behavior for wood mode and low pellet levels
 - **Maintenance Tracking** - Quick access to pellet refill and stove cleaning buttons
 - **Change Indicator** - Visual feedback when stove settings are updating
+
+### Languages
+
+- English
+- French
+- German
+- Swedish
+- Easy to add more languages
 
 ## Credits
 
